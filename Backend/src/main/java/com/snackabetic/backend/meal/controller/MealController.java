@@ -1,10 +1,8 @@
 package com.snackabetic.backend.meal.controller;
 
 import com.snackabetic.backend.common.dto.ApiResponse;
-import com.snackabetic.backend.common.service.FileStorageService;
 import com.snackabetic.backend.meal.dto.MealRequest;
 import com.snackabetic.backend.meal.dto.MealResponse;
-import com.snackabetic.backend.meal.dto.PhotoUploadResponse;
 import com.snackabetic.backend.meal.service.MealService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,11 +13,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -31,7 +27,6 @@ import java.util.List;
 public class MealController {
 
     private final MealService mealService;
-    private final FileStorageService fileStorageService;
 
     @PostMapping
     @Operation(summary = "Yeni öğün oluştur")
@@ -77,14 +72,5 @@ public class MealController {
             @PathVariable Long id) {
         mealService.delete(authentication.getName(), id);
         return ResponseEntity.ok(ApiResponse.ok("Öğün silindi"));
-    }
-
-    @PostMapping(value = "/photo-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Öğün fotoğrafı yükle")
-    public ResponseEntity<ApiResponse<PhotoUploadResponse>> uploadPhoto(
-            @RequestParam("file") MultipartFile file) {
-        String photoUrl = fileStorageService.store(file);
-        PhotoUploadResponse data = PhotoUploadResponse.of(photoUrl);
-        return ResponseEntity.ok(ApiResponse.ok(data, "Fotoğraf başarıyla yüklendi"));
     }
 }
