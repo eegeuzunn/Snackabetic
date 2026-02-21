@@ -7,12 +7,15 @@ import com.snackabetic.backend.auth.security.JwtService;
 import com.snackabetic.backend.common.dto.ErrorCode;
 import com.snackabetic.backend.common.exception.BaseException;
 import com.snackabetic.backend.common.exception.DuplicateResourceException;
+import com.snackabetic.backend.patient.entity.PatientProfile;
+import com.snackabetic.backend.patient.repository.PatientProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +25,9 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final PatientProfileRepository patientProfileRepository;
 
+    @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("Bu e-posta adresi zaten kayıtlı: " + request.getEmail());
@@ -37,6 +42,12 @@ public class AuthService {
                 .build();
 
         user = userRepository.save(user);
+
+        // Otomatik boş hasta profili oluştur
+        PatientProfile profile = PatientProfile.builder()
+                .userId(user.getId())
+                .build();
+        patientProfileRepository.save(profile);
 
         String token = jwtService.generateToken(user.getEmail());
 
