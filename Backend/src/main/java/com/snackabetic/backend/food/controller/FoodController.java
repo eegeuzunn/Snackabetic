@@ -6,6 +6,7 @@ import com.snackabetic.backend.food.service.FoodService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -30,14 +31,14 @@ public class FoodController {
     @Operation(summary = "İsme göre yiyecek ara")
     public ResponseEntity<ApiResponse<Page<FoodResponse>>> search(
             @RequestParam String query,
-            Pageable pageable) {
+            @ParameterObject Pageable pageable) {
         Page<FoodResponse> data = foodService.search(query, pageable);
         return ResponseEntity.ok(ApiResponse.ok(data));
     }
 
     @GetMapping
     @Operation(summary = "Tüm yiyecekleri listele (sayfalı)")
-    public ResponseEntity<ApiResponse<Page<FoodResponse>>> getAll(Pageable pageable) {
+    public ResponseEntity<ApiResponse<Page<FoodResponse>>> getAll(@ParameterObject Pageable pageable) {
         Page<FoodResponse> data = foodService.getAll(pageable);
         return ResponseEntity.ok(ApiResponse.ok(data));
     }

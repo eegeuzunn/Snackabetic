@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -51,7 +52,7 @@ public class GlucoseReadingController {
     @Operation(summary = "Kendi ölçümlerini listele (sayfalı)")
     public ResponseEntity<ApiResponse<Page<GlucoseReadingResponse>>> getMyReadings(
             Authentication authentication,
-            Pageable pageable) {
+            @ParameterObject Pageable pageable) {
         Page<GlucoseReadingResponse> data = glucoseReadingService.getMyReadings(authentication.getName(), pageable);
         return ResponseEntity.ok(ApiResponse.ok(data));
     }
