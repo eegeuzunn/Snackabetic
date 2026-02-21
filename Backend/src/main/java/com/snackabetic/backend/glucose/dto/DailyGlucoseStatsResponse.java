@@ -1,0 +1,21 @@
+package com.snackabetic.backend.glucose.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class DailyGlucoseStatsResponse {
+
+    private LocalDate date;
+    private int readingCount;
+    private int minValueMgDl;
+    private int maxValueMgDl;
+    private double averageValueMgDl;
+}
