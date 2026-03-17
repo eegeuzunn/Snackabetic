@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+data/
+**/combined_food_dataset/
+Ai/.ipynb_checkpoints/
+.ipynb_checkpoints/
+__pycache__/
