@@ -14,7 +14,7 @@ Kurulum:
 Çalıştırma:
   python snackabetic_service.py
 
-  Gerekli dosyalar (Desktop/ai/models/ klasöründe olmalı):
+    Gerekli dosyalar (varsayılan olarak Ai/models/ klasöründe olmalı):
     - best_model.pth       (EfficientNet ağırlıkları)
     - class_mapping.json   (idx → sınıf ismi eşleşmesi)
 """
@@ -37,8 +37,9 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # ─── DOSYA YOLLARI ────────────────────────────────────────────────────────────
-# Sunucuda nereye koyduğuna göre değiştir
-MODELS_DIR     = Path(os.environ.get("MODELS_DIR", os.path.expanduser("~/Desktop/ai/models")))
+# MODELS_DIR env varsa onu kullanır, yoksa bu dosyanın yanındaki models/ klasörünü kullanır
+DEFAULT_MODELS_DIR = Path(__file__).resolve().parent / "models"
+MODELS_DIR     = Path(os.environ.get("MODELS_DIR", str(DEFAULT_MODELS_DIR))).expanduser().resolve()
 MODEL_PATH     = MODELS_DIR / "best_model.pth"
 MAPPING_PATH   = MODELS_DIR / "class_mapping.json"
 
@@ -582,6 +583,7 @@ def analyze_base64():
 
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
     logger.info("=" * 55)
     logger.info("  Snackabetic AI Servisi")
     logger.info(f"  Model:        {MODEL_PATH}")
@@ -592,4 +594,5 @@ if __name__ == "__main__":
     logger.info("    POST /analyze          (multipart)")
     logger.info("    POST /analyze-base64   (JSON)")
     logger.info("=" * 55)
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    logger.info("  Port:         %s", port)
+    app.run(host="0.0.0.0", port=port, debug=False)

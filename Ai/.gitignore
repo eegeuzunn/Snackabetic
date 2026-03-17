@@ -6,4 +6,8 @@ data/
 **/combined_food_dataset/
 Ai/.ipynb_checkpoints/
 .ipynb_checkpoints/
+venv/
+.venv/
+env/
 __pycache__/
+*.pyc
