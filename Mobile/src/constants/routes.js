@@ -7,4 +7,5 @@ export const APP_ROUTES = {
   CAMERA: "Camera",
   HISTORY: "History",
   PREDICTION_RESULT: "PredictionResult",
+  DIABETES_LOG: "DiabetesLog",
 };

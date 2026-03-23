@@ -8,6 +8,7 @@ import DashboardScreen from "../screens/DashboardScreen";
 import CameraScreen from "../screens/CameraScreen";
 import HistoryScreen from "../screens/HistoryScreen";
 import PredictionResultScreen from "../screens/PredictionResultScreen";
+import DiabetesLogScreen from "../screens/DiabetesLogScreen";
 import theme from "../theme";
 import { APP_ROUTES, AUTH_ROUTES } from "../constants/routes";
 
@@ -64,6 +65,11 @@ export default function AppNavigator({ isAuthenticated, onLogin }) {
               name={APP_ROUTES.PREDICTION_RESULT}
               component={PredictionResultScreen}
               options={{ headerShown: true, title: "Tahmin Sonucu" }}
+            />
+            <Stack.Screen
+              name={APP_ROUTES.DIABETES_LOG}
+              component={DiabetesLogScreen}
+              options={{ headerShown: true, title: "Günlük Ekle" }}
             />
           </>
         ) : (
