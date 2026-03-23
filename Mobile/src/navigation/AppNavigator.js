@@ -7,6 +7,7 @@ import LoginScreen from "../screens/LoginScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import CameraScreen from "../screens/CameraScreen";
 import HistoryScreen from "../screens/HistoryScreen";
+import PredictionResultScreen from "../screens/PredictionResultScreen";
 import theme from "../theme";
 import { APP_ROUTES, AUTH_ROUTES } from "../constants/routes";
 
@@ -57,7 +58,14 @@ export default function AppNavigator({ isAuthenticated, onLogin }) {
       <StatusBar style="dark" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
-          <Stack.Screen name="AppTabs" component={AppTabs} />
+          <>
+            <Stack.Screen name="AppTabs" component={AppTabs} />
+            <Stack.Screen
+              name={APP_ROUTES.PREDICTION_RESULT}
+              component={PredictionResultScreen}
+              options={{ headerShown: true, title: "Tahmin Sonucu" }}
+            />
+          </>
         ) : (
           <Stack.Screen name={AUTH_ROUTES.LOGIN}>
             {() => <LoginScreen onLogin={onLogin} />}
@@ -67,3 +75,4 @@ export default function AppNavigator({ isAuthenticated, onLogin }) {
     </NavigationContainer>
   );
 }
+
