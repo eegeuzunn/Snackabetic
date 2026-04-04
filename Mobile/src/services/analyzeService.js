@@ -3,16 +3,13 @@ import { AI_SERVICE_URL } from "../constants/config";
 /**
  * POST {AI_SERVICE_URL}/analyze
  *
- * Python service (snackabetic_service.py) response shape:
+ * AI service response shape:
  * {
- *   predictions: [
- *     { food_name, weight_g, carbs_g, calories },
- *     ...
- *   ]
+ *   top_prediction: { food_name, weight_g, carbs_g, calories, protein_g, fat_g, confidence, volume_ml },
+ *   top5: [...],
+ *   confidence_level: "high" | "medium" | "low",
+ *   ...
  * }
- *
- * @param {string} imageUri - Local file URI from expo-camera / expo-image-picker
- * @returns {Promise<{ foodName: string, weightG: number, carbsG: number, calories: number }>}
  */
 export async function analyzeImage(imageUri) {
   const filename = imageUri.split("/").pop();
@@ -26,20 +23,33 @@ export async function analyzeImage(imageUri) {
     type: mimeType,
   });
 
-  // Python service doesn't require JWT — no Authorization header needed
-  const response = await fetch(`${AI_SERVICE_URL}/analyze`, {
-    method: "POST",
-    // Do NOT set Content-Type manually; fetch sets it with the correct multipart boundary
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.message || `Analiz başarısız (HTTP ${response.status})`);
+  let response;
+  try {
+    response = await fetch(`${AI_SERVICE_URL}/analyze`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (networkError) {
+    throw new Error(
+      `AI servisine ulaşılamadı (${AI_SERVICE_URL}). Servisin çalıştığından emin olun.`
+    );
   }
 
-  const json = await response.json();
-  const top = json?.predictions?.[0] ?? null;
+  const text = await response.text();
+
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = JSON.parse(text);
+      detail = err.error || err.message || text;
+    } catch {
+      detail = text;
+    }
+    throw new Error(`Analiz başarısız (HTTP ${response.status}): ${detail}`);
+  }
+
+  const json = JSON.parse(text);
+  const top = json?.top_prediction ?? null;
 
   if (!top) {
     throw new Error("AI servisi tahmin döndürmedi.");
@@ -50,5 +60,10 @@ export async function analyzeImage(imageUri) {
     weightG: Number(top.weight_g ?? 0),
     carbsG: Number(top.carbs_g ?? 0),
     calories: Number(top.calories ?? 0),
+    proteinG: Number(top.protein_g ?? 0),
+    fatG: Number(top.fat_g ?? 0),
+    confidence: Number(top.confidence ?? 0),
+    confidenceLevel: json.confidence_level ?? "low",
+    top5: json.top5 ?? [],
   };
 }
