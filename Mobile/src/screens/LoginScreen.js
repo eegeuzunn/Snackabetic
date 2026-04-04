@@ -4,7 +4,7 @@ import PrimaryButton from "../components/PrimaryButton";
 import ScreenContainer from "../components/ScreenContainer";
 import theme from "../theme";
 
-export default function LoginScreen({ onLogin }) {
+export default function LoginScreen({ onLogin, onNavigateSignup }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,6 +59,10 @@ export default function LoginScreen({ onLogin }) {
             disabled={isSubmitting}
           />
         </View>
+
+        <Text style={styles.signupLink} onPress={onNavigateSignup}>
+          Hesabın yok mu? <Text style={styles.signupLinkBold}>Kayıt Ol</Text>
+        </Text>
       </View>
     </ScreenContainer>
   );
@@ -102,5 +106,15 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textPrimary,
     backgroundColor: theme.colors.background,
+  },
+  signupLink: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    marginTop: theme.spacing.lg,
+  },
+  signupLinkBold: {
+    color: theme.colors.primary,
+    fontWeight: "600",
   },
 });

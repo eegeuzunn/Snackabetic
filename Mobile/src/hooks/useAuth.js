@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { clearToken, getToken, saveToken } from "../services/authStorage";
 import { setUnauthorizedHandler } from "../services/api";
-import { login as apiLogin } from "../services/authService";
+import { login as apiLogin, register as apiRegister } from "../services/authService";
 
 export default function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
@@ -44,8 +44,24 @@ export default function useAuth() {
       throw new Error("Email ve şifre zorunludur.");
     }
 
-    // apiLogin returns AuthResponse { token, user } (envelope already unwrapped)
     const { token: jwt } = await apiLogin(email.trim(), password.trim());
+    await saveToken(jwt);
+    setToken(jwt);
+  }, []);
+
+  // ── Sign up: register then auto sign in ───────────────────────────────
+  const signUp = useCallback(async ({ email, password, firstName, lastName, phone }) => {
+    if (!email || !password) {
+      throw new Error("Email ve şifre zorunludur.");
+    }
+
+    const { token: jwt } = await apiRegister(
+      email.trim(),
+      password.trim(),
+      firstName?.trim(),
+      lastName?.trim(),
+      phone?.trim()
+    );
     await saveToken(jwt);
     setToken(jwt);
   }, []);
@@ -62,8 +78,9 @@ export default function useAuth() {
       isAuthenticated: Boolean(token),
       isLoading,
       signIn,
+      signUp,
       signOut,
     }),
-    [isLoading, signIn, signOut, token],
+    [isLoading, signIn, signUp, signOut, token],
   );
 }

@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import LoginScreen from "../screens/LoginScreen";
+import SignupScreen from "../screens/SignupScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import CameraScreen from "../screens/CameraScreen";
 import HistoryScreen from "../screens/HistoryScreen";
@@ -53,7 +54,7 @@ function AppTabs() {
   );
 }
 
-export default function AppNavigator({ isAuthenticated, onLogin }) {
+export default function AppNavigator({ isAuthenticated, onLogin, onSignup }) {
   return (
     <NavigationContainer theme={navigationTheme}>
       <StatusBar style="dark" />
@@ -73,12 +74,26 @@ export default function AppNavigator({ isAuthenticated, onLogin }) {
             />
           </>
         ) : (
-          <Stack.Screen name={AUTH_ROUTES.LOGIN}>
-            {() => <LoginScreen onLogin={onLogin} />}
-          </Stack.Screen>
+          <>
+            <Stack.Screen name={AUTH_ROUTES.LOGIN}>
+              {({ navigation }) => (
+                <LoginScreen
+                  onLogin={onLogin}
+                  onNavigateSignup={() => navigation.navigate(AUTH_ROUTES.SIGNUP)}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name={AUTH_ROUTES.SIGNUP}>
+              {({ navigation }) => (
+                <SignupScreen
+                  onSignup={onSignup}
+                  onNavigateLogin={() => navigation.goBack()}
+                />
+              )}
+            </Stack.Screen>
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
-

@@ -1,5 +1,6 @@
 export const AUTH_ROUTES = {
   LOGIN: "Login",
+  SIGNUP: "Signup",
 };
 
 export const APP_ROUTES = {
