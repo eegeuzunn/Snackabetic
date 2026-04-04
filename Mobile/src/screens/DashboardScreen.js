@@ -9,6 +9,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MiniLineChart from "../components/MiniLineChart";
 import { getDashboardData } from "../services/dashboardService";
 import { APP_ROUTES } from "../constants/routes";
@@ -19,6 +20,7 @@ const DEFAULT_CARB_TARGET = 200;
 
 export default function DashboardScreen({ navigation }) {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -90,7 +92,7 @@ export default function DashboardScreen({ navigation }) {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.scroll}
+      contentContainerStyle={[styles.scroll, { paddingTop: insets.top + theme.spacing.lg }]}
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
@@ -214,7 +216,7 @@ function getGlucoseStatus(val, target) {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  scroll: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
+  scroll: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl, paddingTop: theme.spacing.lg },
   centered: {
     flex: 1,
     justifyContent: "center",

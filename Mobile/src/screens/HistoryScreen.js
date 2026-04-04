@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getHistory } from "../services/historyService";
 import { APP_ROUTES } from "../constants/routes";
 import theme from "../theme";
@@ -66,6 +67,7 @@ function InsulinCard({ item }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function HistoryScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [records, setRecords] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -100,7 +102,7 @@ export default function HistoryScreen({ navigation }) {
   // ── Loading ───────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
@@ -109,7 +111,7 @@ export default function HistoryScreen({ navigation }) {
   // ── Error ─────────────────────────────────────────────────────────
   if (error) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={() => load()}>
           <Text style={styles.retryText}>Yeniden Dene</Text>
@@ -121,7 +123,7 @@ export default function HistoryScreen({ navigation }) {
   // ── Empty state ───────────────────────────────────────────────────
   if (records.length === 0) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
         <Text style={styles.emptyEmoji}>📭</Text>
         <Text style={styles.emptyTitle}>Henüz kayıt yok</Text>
         <Text style={styles.emptyDesc}>
@@ -142,7 +144,7 @@ export default function HistoryScreen({ navigation }) {
     <FlatList
       data={records}
       keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[styles.list, { paddingTop: insets.top + theme.spacing.lg }]}
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
