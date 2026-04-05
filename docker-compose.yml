@@ -9,6 +9,11 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d snackabetic"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   backend:
     build:
@@ -23,8 +28,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/snackabetic
       AI_SERVICE_URL: http://ai:5000
     depends_on:
-      - db
-      - ai
+      db:
+        condition: service_healthy
+      ai:
+        condition: service_started
     volumes:
       - uploads:/app/uploads
 
