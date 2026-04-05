@@ -3,45 +3,47 @@ import { getMyProfile } from "./patientService";
 
 /**
  * Fetches all data needed for the Dashboard screen in parallel:
- *   - today's meals  (→ carb total)
- *   - patient profile  (→ carb/glucose targets)
+ *   - today's meals      (→ carb total, calorie total, meal count)
+ *   - today's insulin    (→ total units)
+ *   - patient profile    (→ carb/glucose targets)
  *   - glucose trend for last `days` days
  *   - today's glucose daily-stats (min/max/avg)
  */
 export async function getDashboardData(days = 7) {
   const today = new Date().toISOString().slice(0, 10);
 
-  const [mealsResult, profileResult, statsResult, trendPoints] =
+  const [mealsResult, insulinResult, profileResult, statsResult, trendPoints, recentMealsResult] =
     await Promise.all([
-      // Today's meals
-      api
-        .get("/meals/by-date", { params: { date: today } })
-        .catch(() => []),
-
-      // Patient profile (glucose / carb targets)
+      api.get("/meals/by-date", { params: { date: today } }).catch(() => []),
+      api.get("/insulin-doses/by-date", { params: { date: today } }).catch(() => []),
       getMyProfile().catch(() => null),
-
-      // Today's glucose daily stats
-      api
-        .get("/glucose-readings/daily-stats", { params: { date: today } })
-        .catch(() => null),
-
-      // Last N days glucose trend
+      api.get("/glucose-readings/daily-stats", { params: { date: today } }).catch(() => null),
       buildGlucoseTrend(days),
+      api.get("/meals", { params: { page: 0, size: 5, sort: "mealTime,desc" } }).catch(() => null),
     ]);
 
-  // Sum carbs from all meals today
   const meals = Array.isArray(mealsResult) ? mealsResult : [];
   const totalCarbsG =
-    Math.round(
-      meals.reduce((s, m) => s + (parseFloat(m.totalCarbsG) || 0), 0) * 10,
-    ) / 10;
+    Math.round(meals.reduce((s, m) => s + (parseFloat(m.totalCarbsG) || 0), 0) * 10) / 10;
+  const totalCalories =
+    Math.round(meals.reduce((s, m) => s + (parseFloat(m.totalCalories) || 0), 0));
+  const mealCount = meals.length;
+
+  const doses = Array.isArray(insulinResult) ? insulinResult : [];
+  const totalInsulinUnits =
+    Math.round(doses.reduce((s, d) => s + (parseFloat(d.units) || 0), 0) * 10) / 10;
+
+  const recentMeals = recentMealsResult?.content ?? (Array.isArray(recentMealsResult) ? recentMealsResult : []);
 
   return {
     totalCarbsG,
-    profile: profileResult,         // PatientProfileResponse | null
-    dailyStats: statsResult,        // { avg, min, max } | null
-    glucoseTrend: trendPoints,      // [{ date, avg }]
+    totalCalories,
+    mealCount,
+    totalInsulinUnits,
+    profile: profileResult,
+    dailyStats: statsResult,
+    glucoseTrend: trendPoints,
+    recentMeals,
   };
 }
 
@@ -62,9 +64,7 @@ async function buildGlucoseTrend(days) {
           const arr = Array.isArray(readings) ? readings : [];
           const avg =
             arr.length > 0
-              ? Math.round(
-                  arr.reduce((s, r) => s + (r.valueMgDl ?? 0), 0) / arr.length,
-                )
+              ? Math.round(arr.reduce((s, r) => s + (r.valueMgDl ?? 0), 0) / arr.length)
               : null;
           results.push({ date: dateStr, avg });
         })
