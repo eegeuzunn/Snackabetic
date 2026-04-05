@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Accelerometer } from "expo-sensors";
-import NetworkLogger from "react-native-network-logger";
+import NetworkLogger, { startNetworkLogging } from "react-native-network-logger";
 import theme from "../theme";
 
 const SHAKE_THRESHOLD = 2.0;
@@ -14,6 +14,8 @@ export default function NetworkDebugOverlay() {
 
   useEffect(() => {
     if (!__DEV__) return;
+
+    startNetworkLogging();
 
     Accelerometer.setUpdateInterval(100);
     let lastShakeAt = 0;
