@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
 import { getHistory } from "../services/historyService";
 import { APP_ROUTES } from "../constants/routes";
 import theme from "../theme";
@@ -19,7 +20,9 @@ function MealCard({ item }) {
   const cal = item.totalCalories != null ? `${Math.round(item.totalCalories)} kcal` : null;
   return (
     <View style={[styles.card, styles.mealCard]}>
-      <View style={styles.cardIcon}><Text style={styles.iconText}>🍽️</Text></View>
+      <View style={[styles.cardIcon, { backgroundColor: "#EFF6FF" }]}>
+        <Feather name="coffee" size={18} color={theme.colors.primary} />
+      </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle}>Öğün — {item.foodName ?? "—"}</Text>
         <Text style={styles.cardSub}>
@@ -35,7 +38,9 @@ function GlucoseCard({ item }) {
   const level = getGlucoseLevel(item.valueMgDl);
   return (
     <View style={[styles.card, styles.glucoseCard]}>
-      <View style={styles.cardIcon}><Text style={styles.iconText}>🩸</Text></View>
+      <View style={[styles.cardIcon, { backgroundColor: "#FEF2F2" }]}>
+        <Feather name="activity" size={18} color="#EF4444" />
+      </View>
       <View style={styles.cardBody}>
         <View style={styles.titleRow}>
           <Text style={styles.cardTitle}>Kan Şekeri</Text>
@@ -54,7 +59,9 @@ function GlucoseCard({ item }) {
 function InsulinCard({ item }) {
   return (
     <View style={[styles.card, styles.insulinCard]}>
-      <View style={styles.cardIcon}><Text style={styles.iconText}>💉</Text></View>
+      <View style={[styles.cardIcon, { backgroundColor: "#F5F3FF" }]}>
+        <Feather name="droplet" size={18} color="#8B5CF6" />
+      </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle}>İnsülin — {item.insulinType}</Text>
         <Text style={styles.cardSub}>{item.units} ünite</Text>
@@ -124,7 +131,9 @@ export default function HistoryScreen({ navigation }) {
   if (records.length === 0) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top }]}>
-        <Text style={styles.emptyEmoji}>📭</Text>
+        <View style={styles.emptyIconWrap}>
+          <Feather name="inbox" size={36} color={theme.colors.textSecondary} />
+        </View>
         <Text style={styles.emptyTitle}>Henüz kayıt yok</Text>
         <Text style={styles.emptyDesc}>
           Yemek taradıkça veya günlük ekledikçe kayıtların burada görünür.
@@ -133,7 +142,8 @@ export default function HistoryScreen({ navigation }) {
           style={styles.ctaBtn}
           onPress={() => navigation.navigate(APP_ROUTES.CAMERA)}
         >
-          <Text style={styles.ctaText}>📷  Yemek Tara</Text>
+          <Feather name="camera" size={16} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={styles.ctaText}>Yemek Tara</Text>
         </TouchableOpacity>
       </View>
     );
@@ -228,8 +238,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  iconText: { fontSize: 20 },
-
   cardBody: { flex: 1 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm, marginBottom: 2 },
   cardTitle: {
@@ -267,7 +275,17 @@ const styles = StyleSheet.create({
   },
 
   // Empty state
-  emptyEmoji: { fontSize: 48, marginBottom: theme.spacing.md },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: theme.spacing.md,
+  },
   emptyTitle: {
     ...theme.typography.heading,
     color: theme.colors.textPrimary,
@@ -280,13 +298,15 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   ctaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: theme.colors.primary,
     borderRadius: 14,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.xl,
   },
   ctaText: {
-    color: theme.colors.surface,
+    color: "#fff",
     ...theme.typography.body,
     fontWeight: "700",
   },
