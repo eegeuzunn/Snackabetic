@@ -50,27 +50,27 @@ export async function getDashboardData(days = 7) {
 /** Fetches glucose by-date for each day and returns avg per day */
 async function buildGlucoseTrend(days) {
   const base = new Date();
-  const results = [];
 
-  await Promise.allSettled(
-    Array.from({ length: days }, (_, i) => {
-      const d = new Date(base);
-      d.setDate(base.getDate() - (days - 1 - i));
-      const dateStr = d.toISOString().slice(0, 10);
+  const dates = Array.from({ length: days }, (_, i) => {
+    const d = new Date(base);
+    d.setDate(base.getDate() - (days - 1 - i));
+    return d.toISOString().slice(0, 10);
+  });
 
-      return api
-        .get("/glucose-readings/by-date", { params: { date: dateStr } })
-        .then((readings) => {
-          const arr = Array.isArray(readings) ? readings : [];
-          const avg =
-            arr.length > 0
-              ? Math.round(arr.reduce((s, r) => s + (r.valueMgDl ?? 0), 0) / arr.length)
-              : null;
-          results.push({ date: dateStr, avg });
-        })
-        .catch(() => results.push({ date: dateStr, avg: null }));
-    }),
+  const settled = await Promise.allSettled(
+    dates.map((dateStr) =>
+      api.get("/glucose-readings/by-date", { params: { date: dateStr } })
+    )
   );
 
-  return results.sort((a, b) => a.date.localeCompare(b.date));
+  return dates.map((dateStr, i) => {
+    const result = settled[i];
+    if (result.status !== "fulfilled") return { date: dateStr, avg: null };
+    const arr = Array.isArray(result.value) ? result.value : [];
+    const avg =
+      arr.length > 0
+        ? Math.round(arr.reduce((s, r) => s + (r.valueMgDl ?? 0), 0) / arr.length)
+        : null;
+    return { date: dateStr, avg };
+  });
 }

@@ -20,7 +20,7 @@ export default function MiniLineChart({ data, width = 300, height = 120 }) {
 
   // Filter out null values for scale calculation
   const values = data.map((d) => d.avg).filter((v) => v != null);
-  if (values.length < 2) {
+  if (values.length === 0) {
     return <View style={{ width, height }} />;
   }
 
