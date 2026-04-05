@@ -313,10 +313,20 @@ def estimate_weight(
     """
     import cv2
 
-    h, w = depth_map.shape
-
-    # — Yemek maskesi (HSV segmentasyon) —
+    # — Görüntü array'ine çevir —
     img_arr = np.array(pil_image.convert("RGB"))
+    img_h, img_w = img_arr.shape[:2]
+
+    # — Depth map'i görüntü boyutuna resize et (boyutlar farklı gelebilir) —
+    if depth_map.shape[0] != img_h or depth_map.shape[1] != img_w:
+        depth_map = ndimage.zoom(
+            depth_map,
+            (img_h / depth_map.shape[0], img_w / depth_map.shape[1]),
+            order=1,
+        )
+
+    h, w = depth_map.shape  # artık img_h, img_w ile aynı
+    # — Yemek maskesi (HSV segmentasyon) —
     img_hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
     sat, bri = img_hsv[:, :, 1], img_hsv[:, :, 2]
     mask = (sat > 25) & (bri > 30) & (bri < 240)
