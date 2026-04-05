@@ -84,4 +84,17 @@ public class AuthService {
                 });
         return UserResponse.from(user);
     }
+
+    @Transactional
+    public UserResponse updateMe(String email, UpdateUserRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND, "Kullanıcı bulunamadı") {
+                });
+
+        if (request.getFirstName() != null) user.setFirstName(request.getFirstName());
+        if (request.getLastName() != null) user.setLastName(request.getLastName());
+        if (request.getPhone() != null) user.setPhone(request.getPhone());
+
+        return UserResponse.from(userRepository.save(user));
+    }
 }

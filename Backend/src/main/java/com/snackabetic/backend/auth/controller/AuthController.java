@@ -3,6 +3,7 @@ package com.snackabetic.backend.auth.controller;
 import com.snackabetic.backend.auth.dto.AuthResponse;
 import com.snackabetic.backend.auth.dto.LoginRequest;
 import com.snackabetic.backend.auth.dto.RegisterRequest;
+import com.snackabetic.backend.auth.dto.UpdateUserRequest;
 import com.snackabetic.backend.auth.dto.UserResponse;
 import com.snackabetic.backend.auth.service.AuthService;
 import com.snackabetic.backend.common.dto.ApiResponse;
@@ -43,5 +44,14 @@ public class AuthController {
     public ResponseEntity<ApiResponse<UserResponse>> me(Authentication authentication) {
         UserResponse data = authService.me(authentication.getName());
         return ResponseEntity.ok(ApiResponse.ok(data));
+    }
+
+    @PutMapping("/me")
+    @Operation(summary = "Giriş yapmış kullanıcının bilgilerini güncelle")
+    public ResponseEntity<ApiResponse<UserResponse>> updateMe(
+            Authentication authentication,
+            @RequestBody UpdateUserRequest request) {
+        UserResponse data = authService.updateMe(authentication.getName(), request);
+        return ResponseEntity.ok(ApiResponse.ok(data, "Bilgiler güncellendi"));
     }
 }
