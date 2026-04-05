@@ -4,9 +4,10 @@ export const AUTH_ROUTES = {
 };
 
 export const APP_ROUTES = {
-  DASHBOARD: "Dashboard",
+  DASHBOARD: "Home",
   CAMERA: "Camera",
   HISTORY: "History",
+  SETTINGS: "Settings",
   PREDICTION_RESULT: "PredictionResult",
   DIABETES_LOG: "DiabetesLog",
 };
