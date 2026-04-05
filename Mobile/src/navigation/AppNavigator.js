@@ -5,14 +5,16 @@ import { StatusBar } from "expo-status-bar";
 import { Feather } from "@expo/vector-icons";
 import LoginScreen from "../screens/LoginScreen";
 import SignupScreen from "../screens/SignupScreen";
+import ProfileSetupScreen from "../screens/ProfileSetupScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import CameraScreen from "../screens/CameraScreen";
 import HistoryScreen from "../screens/HistoryScreen";
 import SettingsScreen from "../screens/SettingsScreen";
+import EditProfileScreen from "../screens/EditProfileScreen";
 import PredictionResultScreen from "../screens/PredictionResultScreen";
 import DiabetesLogScreen from "../screens/DiabetesLogScreen";
 import theme from "../theme";
-import { APP_ROUTES, AUTH_ROUTES } from "../constants/routes";
+import { APP_ROUTES, AUTH_ROUTES, STACK_ROUTES } from "../constants/routes";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -91,13 +93,18 @@ function AppTabs({ onSignOut }) {
   );
 }
 
-export default function AppNavigator({ isAuthenticated, onLogin, onSignup, onSignOut }) {
+export default function AppNavigator({ isAuthenticated, needsOnboarding, onLogin, onSignup, onSignOut, onOnboardingComplete }) {
   return (
     <NavigationContainer theme={navigationTheme}>
       <StatusBar style="dark" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           <>
+            {needsOnboarding && (
+              <Stack.Screen name="ProfileSetup">
+                {() => <ProfileSetupScreen onComplete={onOnboardingComplete} />}
+              </Stack.Screen>
+            )}
             <Stack.Screen name="AppTabs">
               {() => <AppTabs onSignOut={onSignOut} />}
             </Stack.Screen>
@@ -116,6 +123,11 @@ export default function AppNavigator({ isAuthenticated, onLogin, onSignup, onSig
                   route.params?.type === "insulin" ? "İnsülin Dozu" :
                   "Günlük Ekle",
               })}
+            />
+            <Stack.Screen
+              name={STACK_ROUTES.EDIT_PROFILE}
+              component={EditProfileScreen}
+              options={{ headerShown: true, title: "Profili Düzenle" }}
             />
           </>
         ) : (

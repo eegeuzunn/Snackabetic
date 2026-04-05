@@ -6,6 +6,7 @@ import { login as apiLogin, register as apiRegister } from "../services/authServ
 export default function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
   const [token, setToken] = useState(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   // ── Bootstrap: load persisted token on app start ──────────────────────
   useEffect(() => {
@@ -49,7 +50,7 @@ export default function useAuth() {
     setToken(jwt);
   }, []);
 
-  // ── Sign up: register then auto sign in ───────────────────────────────
+  // ── Sign up: register then auto sign in, then show onboarding ────────
   const signUp = useCallback(async ({ email, password, firstName, lastName, phone }) => {
     if (!email || !password) {
       throw new Error("Email ve şifre zorunludur.");
@@ -63,7 +64,13 @@ export default function useAuth() {
       phone?.trim()
     );
     await saveToken(jwt);
+    setNeedsOnboarding(true);
     setToken(jwt);
+  }, []);
+
+  // ── Complete onboarding ───────────────────────────────────────────────
+  const completeOnboarding = useCallback(() => {
+    setNeedsOnboarding(false);
   }, []);
 
   // ── Sign out ───────────────────────────────────────────────────────────
@@ -77,10 +84,12 @@ export default function useAuth() {
       token,
       isAuthenticated: Boolean(token),
       isLoading,
+      needsOnboarding,
       signIn,
       signUp,
       signOut,
+      completeOnboarding,
     }),
-    [isLoading, signIn, signUp, signOut, token],
+    [isLoading, needsOnboarding, signIn, signUp, signOut, token, completeOnboarding],
   );
 }

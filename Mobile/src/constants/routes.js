@@ -11,3 +11,7 @@ export const APP_ROUTES = {
   PREDICTION_RESULT: "PredictionResult",
   DIABETES_LOG: "DiabetesLog",
 };
+
+export const STACK_ROUTES = {
+  EDIT_PROFILE: "EditProfile",
+};
