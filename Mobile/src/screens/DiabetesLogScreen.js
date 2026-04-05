@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     ...theme.typography.body,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.md,
   },

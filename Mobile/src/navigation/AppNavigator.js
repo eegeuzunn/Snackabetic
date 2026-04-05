@@ -7,6 +7,7 @@ import LoginScreen from "../screens/LoginScreen";
 import SignupScreen from "../screens/SignupScreen";
 import ProfileSetupScreen from "../screens/ProfileSetupScreen";
 import DashboardScreen from "../screens/DashboardScreen";
+import AddMealScreen from "../screens/AddMealScreen";
 import CameraScreen from "../screens/CameraScreen";
 import HistoryScreen from "../screens/HistoryScreen";
 import SettingsScreen from "../screens/SettingsScreen";
@@ -15,6 +16,7 @@ import PredictionResultScreen from "../screens/PredictionResultScreen";
 import DiabetesLogScreen from "../screens/DiabetesLogScreen";
 import theme from "../theme";
 import { APP_ROUTES, AUTH_ROUTES, STACK_ROUTES } from "../constants/routes";
+
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -33,7 +35,7 @@ const navigationTheme = {
 
 const TAB_ICONS = {
   [APP_ROUTES.DASHBOARD]: "home",
-  [APP_ROUTES.CAMERA]:    "camera",
+  [APP_ROUTES.ADD_MEAL]:  "plus-circle",
   [APP_ROUTES.HISTORY]:   "clock",
   [APP_ROUTES.SETTINGS]:  "user",
 };
@@ -55,7 +57,7 @@ function AppTabs({ onSignOut }) {
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: "600",
+          fontFamily: "Outfit_600SemiBold",
           marginTop: 2,
         },
         tabBarIcon: ({ color, focused }) => (
@@ -74,9 +76,9 @@ function AppTabs({ onSignOut }) {
         options={{ title: "Home" }}
       />
       <Tab.Screen
-        name={APP_ROUTES.CAMERA}
-        component={CameraScreen}
-        options={{ title: "Kamera" }}
+        name={APP_ROUTES.ADD_MEAL}
+        component={AddMealScreen}
+        options={{ title: "Öğün" }}
       />
       <Tab.Screen
         name={APP_ROUTES.HISTORY}
@@ -128,6 +130,11 @@ export default function AppNavigator({ isAuthenticated, needsOnboarding, onLogin
               name={STACK_ROUTES.EDIT_PROFILE}
               component={EditProfileScreen}
               options={{ headerShown: true, title: "Profili Düzenle" }}
+            />
+            <Stack.Screen
+              name={STACK_ROUTES.CAMERA}
+              component={CameraScreen}
+              options={{ headerShown: false }}
             />
           </>
         ) : (

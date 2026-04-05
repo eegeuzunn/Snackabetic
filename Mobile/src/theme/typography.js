@@ -2,27 +2,27 @@ const typography = {
   title: {
     fontSize: 28,
     lineHeight: 34,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
   },
   heading: {
     fontSize: 22,
     lineHeight: 28,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
   },
   body: {
     fontSize: 16,
     lineHeight: 24,
-    fontWeight: "400",
+    fontFamily: "Outfit_400Regular",
   },
   caption: {
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: "500",
+    fontFamily: "Outfit_500Medium",
   },
   button: {
     fontSize: 18,
     lineHeight: 24,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
   },
 };
 

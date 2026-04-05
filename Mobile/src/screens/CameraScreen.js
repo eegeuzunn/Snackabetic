@@ -11,9 +11,12 @@ import {
   View,
 } from "react-native";
 import { analyzeImage } from "../services/analyzeService";
+import { APP_ROUTES } from "../constants/routes";
 import theme from "../theme";
 
-export default function CameraScreen({ navigation }) {
+export default function CameraScreen({ navigation, route }) {
+  const mealType = route.params?.mealType ?? "SNACK";
+  const returnToMeal = route.params?.returnToMeal ?? false;
   const [permission, requestPermission] = useCameraPermissions();
   const [photoUri, setPhotoUri] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -68,7 +71,7 @@ export default function CameraScreen({ navigation }) {
     try {
       const prediction = await analyzeImage(photoUri);
       // Navigate to PredictionResultScreen with the result and image
-      navigation.navigate("PredictionResult", { prediction, photoUri });
+      navigation.navigate(APP_ROUTES.PREDICTION_RESULT, { prediction, photoUri, mealType, returnToMeal });
     } catch (error) {
       Alert.alert("Analiz Hatası", error.message || "Lütfen tekrar deneyin.");
     } finally {

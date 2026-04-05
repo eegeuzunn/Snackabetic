@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm, marginBottom: 2 },
   cardTitle: {
     ...theme.typography.body,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
     color: theme.colors.textPrimary,
   },
   cardSub: {
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   },
   levelText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
     color: theme.colors.textPrimary,
   },
 
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   ctaText: {
     color: "#fff",
     ...theme.typography.body,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
   },
 
   // Error
@@ -328,6 +328,6 @@ const styles = StyleSheet.create({
   retryText: {
     ...theme.typography.caption,
     color: theme.colors.primary,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
   },
 });

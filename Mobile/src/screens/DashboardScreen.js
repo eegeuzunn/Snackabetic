@@ -96,7 +96,6 @@ export default function DashboardScreen({ navigation }) {
     >
       {/* ── Header ─────────────────────────────────────────────── */}
       <Text style={styles.greeting}>Snackabetic</Text>
-      <Text style={styles.date}>{formatDate(new Date())}</Text>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {/* ── Bugünün Özeti ──────────────────────────────────────── */}
@@ -163,9 +162,9 @@ export default function DashboardScreen({ navigation }) {
       <Text style={styles.sectionTitle}>Hızlı İşlemler</Text>
       <View style={styles.quickRow}>
         <QuickButton
-          label="Yemek Tara"
+          label="Öğün Ekle"
           color={theme.colors.primary}
-          onPress={() => navigation.navigate(APP_ROUTES.CAMERA)}
+          onPress={() => navigation.navigate(APP_ROUTES.ADD_MEAL)}
         />
         <QuickButton
           label="Glukoz Ekle"
@@ -177,6 +176,23 @@ export default function DashboardScreen({ navigation }) {
           color="#8B5CF6"
           onPress={() => navigation.navigate(APP_ROUTES.DIABETES_LOG, { type: "insulin" })}
         />
+      </View>
+
+      {/* ── 7 günlük kan şekeri trendi ─────────────────────────── */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>Son 7 Gün Kan Şekeri</Text>
+          {avgGlucose != null && (
+            <View style={[styles.badge, { backgroundColor: glucoseStatus.bg }]}>
+              <Text style={styles.badgeText}>{glucoseStatus.label}</Text>
+            </View>
+          )}
+        </View>
+        {glucoseTrend.every((d) => d.avg == null) ? (
+          <Text style={styles.emptyText}>Henüz kan şekeri kaydı yok.</Text>
+        ) : (
+          <MiniLineChart data={glucoseTrend} width={chartWidth} height={130} />
+        )}
       </View>
 
       {/* ── Son Yenilenler ──────────────────────────────────────── */}
@@ -204,24 +220,6 @@ export default function DashboardScreen({ navigation }) {
           ))}
         </View>
       )}
-
-      {/* ── 7 günlük kan şekeri trendi ─────────────────────────── */}
-      <View style={{ height: theme.spacing.md }} />
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Son 7 Gün Kan Şekeri</Text>
-          {avgGlucose != null && (
-            <View style={[styles.badge, { backgroundColor: glucoseStatus.bg }]}>
-              <Text style={styles.badgeText}>{glucoseStatus.label}</Text>
-            </View>
-          )}
-        </View>
-        {glucoseTrend.every((d) => d.avg == null) ? (
-          <Text style={styles.emptyText}>Henüz kan şekeri kaydı yok.</Text>
-        ) : (
-          <MiniLineChart data={glucoseTrend} width={chartWidth} height={130} />
-        )}
-      </View>
 
     </ScrollView>
   );
@@ -271,12 +269,12 @@ const styles = StyleSheet.create({
   scroll: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl, paddingTop: theme.spacing.lg },
   centered: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: theme.colors.background },
 
-  greeting: { ...theme.typography.title, color: theme.colors.textPrimary },
-  date: {
-    ...theme.typography.caption,
-    color: theme.colors.textSecondary,
+  greeting: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 36,
+    color: theme.colors.textPrimary,
+    textAlign: "center",
     marginBottom: theme.spacing.lg,
-    textTransform: "capitalize",
   },
   errorText: { ...theme.typography.caption, color: theme.colors.danger, marginBottom: theme.spacing.md },
 
@@ -296,7 +294,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     ...theme.typography.caption,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.md,
   },
@@ -304,29 +302,29 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: "row", alignItems: "center" },
   summaryTile: { flex: 1, alignItems: "center", paddingVertical: theme.spacing.sm },
   tileDivider: { width: 1, height: 48, backgroundColor: theme.colors.border },
-  tileValue: { fontSize: 22, fontWeight: "700", color: theme.colors.textPrimary },
-  tileUnit: { fontSize: 13, fontWeight: "400", color: theme.colors.textSecondary },
+  tileValue: { fontSize: 22, fontFamily: "Outfit_700Bold", color: theme.colors.textPrimary },
+  tileUnit: { fontSize: 13, fontFamily: "Outfit_400Regular", color: theme.colors.textSecondary },
   tileLabel: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 2, textAlign: "center" },
 
   rowDivider: { height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.md },
 
   recentMealRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: theme.spacing.sm },
   recentMealInfo: { flex: 1 },
-  recentMealType: { ...theme.typography.caption, fontWeight: "700", color: theme.colors.textPrimary },
+  recentMealType: { ...theme.typography.caption, fontFamily: "Outfit_700Bold", color: theme.colors.textPrimary },
   recentMealTime: { ...theme.typography.caption, color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
   recentMealValues: { alignItems: "flex-end" },
-  recentMealCarbs: { ...theme.typography.caption, fontWeight: "700", color: theme.colors.primary },
+  recentMealCarbs: { ...theme.typography.caption, fontFamily: "Outfit_700Bold", color: theme.colors.primary },
   recentMealCal: { ...theme.typography.caption, color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
 
   mealCountText: { ...theme.typography.caption, color: theme.colors.textSecondary, textAlign: "center" },
 
   badge: { borderRadius: 20, paddingHorizontal: theme.spacing.sm, paddingVertical: 2 },
-  badgeText: { fontSize: 12, fontWeight: "700", color: theme.colors.textPrimary },
+  badgeText: { fontSize: 12, fontFamily: "Outfit_700Bold", color: theme.colors.textPrimary },
 
   emptyText: { ...theme.typography.body, color: theme.colors.textSecondary, textAlign: "center", paddingVertical: theme.spacing.lg },
 
-  sectionTitle: { ...theme.typography.body, fontWeight: "700", color: theme.colors.textPrimary, marginBottom: theme.spacing.md },
-  quickRow: { flexDirection: "row", gap: theme.spacing.sm },
+  sectionTitle: { ...theme.typography.body, fontFamily: "Outfit_700Bold", color: theme.colors.textPrimary, marginBottom: theme.spacing.md },
+  quickRow: { flexDirection: "row", gap: theme.spacing.sm, marginBottom: theme.spacing.md },
   quickBtn: {
     flex: 1,
     borderRadius: 14,
@@ -335,5 +333,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 52,
   },
-  quickBtnLabel: { fontSize: 12, lineHeight: 16, fontWeight: "700", color: "#fff", textAlign: "center" },
+  quickBtnLabel: { fontSize: 12, lineHeight: 16, fontFamily: "Outfit_700Bold", color: "#fff", textAlign: "center" },
 });

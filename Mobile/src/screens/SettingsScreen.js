@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: theme.spacing.md,
   },
-  avatarText: { fontSize: 28, fontWeight: "700", color: "#fff" },
+  avatarText: { fontSize: 28, fontFamily: "Outfit_700Bold", color: "#fff" },
   fullName: { ...theme.typography.heading, color: theme.colors.textPrimary },
   email: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 4 },
   editBtn: {
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
   },
-  editBtnText: { ...theme.typography.caption, fontWeight: "700", color: theme.colors.primary },
+  editBtnText: { ...theme.typography.caption, fontFamily: "Outfit_700Bold", color: theme.colors.primary },
 
   card: {
     backgroundColor: theme.colors.surface,
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     ...theme.typography.caption,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.md,
   },
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   infoLabel: { ...theme.typography.caption, color: theme.colors.textSecondary },
-  infoValue: { ...theme.typography.caption, fontWeight: "600", color: theme.colors.textPrimary },
+  infoValue: { ...theme.typography.caption, fontFamily: "Outfit_600SemiBold", color: theme.colors.textPrimary },
 
   signOutBtn: {
     marginTop: theme.spacing.md,
@@ -245,5 +245,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  signOutText: { ...theme.typography.caption, fontWeight: "700", color: theme.colors.danger },
+  signOutText: { ...theme.typography.caption, fontFamily: "Outfit_700Bold", color: theme.colors.danger },
 });

@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
 
   label: {
     ...theme.typography.caption,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,
     marginTop: theme.spacing.md,
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
     backgroundColor: theme.colors.primary,
   },
-  chipText: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: "600" },
+  chipText: { ...theme.typography.caption, color: theme.colors.textSecondary, fontFamily: "Outfit_600SemiBold" },
   chipTextSelected: { color: "#fff" },
 
   row: { flexDirection: "row", gap: theme.spacing.md },
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: theme.spacing.xl,
   },
-  saveBtnText: { ...theme.typography.body, fontWeight: "700", color: "#fff" },
+  saveBtnText: { ...theme.typography.body, fontFamily: "Outfit_700Bold", color: "#fff" },
 
   skipBtn: {
     alignItems: "center",

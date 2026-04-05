@@ -115,6 +115,6 @@ const styles = StyleSheet.create({
   },
   signupLinkBold: {
     color: theme.colors.primary,
-    fontWeight: "600",
+    fontFamily: "Outfit_600SemiBold",
   },
 });

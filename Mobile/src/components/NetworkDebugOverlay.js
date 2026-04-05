@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
     color: theme.colors.textPrimary,
   },
   closeBtn: {
@@ -76,6 +76,6 @@ const styles = StyleSheet.create({
   },
   closeBtnText: {
     color: "#fff",
-    fontWeight: "600",
+    fontFamily: "Outfit_600SemiBold",
   },
 });

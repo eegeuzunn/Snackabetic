@@ -27,10 +27,10 @@ function useDebounce(value, delay = 400) {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function PredictionResultScreen({ route, navigation }) {
-  const { prediction, photoUri } = route.params ?? {};
+  const { prediction, photoUri, mealType = "SNACK", manual = false, returnToMeal = false } = route.params ?? {};
 
   // ── State ────────────────────────────────────────────────────────────
-  const [mode, setMode] = useState("review"); // "review" | "edit"
+  const [mode, setMode] = useState(manual ? "edit" : "review"); // "review" | "edit"
 
   // Editable values (start with AI prediction)
   const [gram, setGram] = useState(String(prediction?.weightG ?? ""));
@@ -96,15 +96,31 @@ export default function PredictionResultScreen({ route, navigation }) {
       return;
     }
 
+    if (returnToMeal) {
+      // Pass item back to AddMealScreen instead of saving directly
+      navigation.navigate(APP_ROUTES.ADD_MEAL, {
+        addItem: {
+          foodId: selectedFood.id,
+          foodName: selectedFood.name,
+          amountGrams: parsedGram,
+          carbsPer100g: selectedFood.carbsPer100g ?? 0,
+          caloriesPer100g: selectedFood.caloriesPer100g ?? 0,
+          proteinPer100g: selectedFood.proteinPer100g ?? 0,
+          fatPer100g: selectedFood.fatPer100g ?? 0,
+          carbsG: selectedFood.carbsPer100g != null ? +(selectedFood.carbsPer100g * parsedGram / 100).toFixed(1) : 0,
+          calories: selectedFood.caloriesPer100g != null ? +(selectedFood.caloriesPer100g * parsedGram / 100).toFixed(1) : 0,
+          proteinG: selectedFood.proteinPer100g != null ? +(selectedFood.proteinPer100g * parsedGram / 100).toFixed(1) : 0,
+          fatG: selectedFood.fatPer100g != null ? +(selectedFood.fatPer100g * parsedGram / 100).toFixed(1) : 0,
+        },
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      await createMeal({ foodId: selectedFood.id, amountGrams: parsedGram });
+      await createMeal({ items: [{ foodId: selectedFood.id, amountGrams: parsedGram }], mealType });
       Alert.alert("Kaydedildi", "Öğün başarıyla eklendi.", [
-        {
-          text: "Tamam",
-          onPress: () =>
-            navigation.navigate(APP_ROUTES.DASHBOARD),
-        },
+        { text: "Tamam", onPress: () => navigation.navigate(APP_ROUTES.DASHBOARD) },
       ]);
     } catch (error) {
       Alert.alert("Kayıt Hatası", error.message || "Lütfen tekrar deneyin.");
@@ -255,13 +271,13 @@ export default function PredictionResultScreen({ route, navigation }) {
         {isSaving ? (
           <ActivityIndicator color={theme.colors.surface} />
         ) : (
-          <Text style={styles.btnText}>Kaydet</Text>
+          <Text style={styles.btnText}>{returnToMeal ? "Öğüne Ekle" : "Kaydet"}</Text>
         )}
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.btnSecondary}
-        onPress={() => setMode("review")}
+        onPress={() => manual ? navigation.goBack() : setMode("review")}
         disabled={isSaving}
       >
         <Text style={styles.btnSecondaryText}>Geri Dön</Text>
@@ -331,7 +347,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     ...theme.typography.body,
-    fontWeight: "700",
+    fontFamily: "Outfit_700Bold",
     color: theme.colors.primary,
   },
   statLabel: {
