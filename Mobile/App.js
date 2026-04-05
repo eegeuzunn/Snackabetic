@@ -7,7 +7,7 @@ import theme from "./src/theme";
 import NetworkDebugOverlay from "./src/components/NetworkDebugOverlay";
 
 export default function App() {
-  const { isAuthenticated, isLoading, signIn, signUp } = useAuth();
+  const { isAuthenticated, isLoading, signIn, signUp, signOut } = useAuth();
 
   if (isLoading) {
     return (
@@ -26,6 +26,7 @@ export default function App() {
           isAuthenticated={isAuthenticated}
           onLogin={signIn}
           onSignup={signUp}
+          onSignOut={signOut}
         />
         <NetworkDebugOverlay />
       </View>
