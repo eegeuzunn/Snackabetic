@@ -16,27 +16,34 @@ import { createInsulinDose } from "../services/insulinService";
 import { APP_ROUTES } from "../constants/routes";
 import theme from "../theme";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
 const INSULIN_TYPES = ["RAPID", "LONG", "MIXED"];
 
-export default function DiabetesLogScreen({ navigation }) {
-  // ── Form state ────────────────────────────────────────────────────
+export default function DiabetesLogScreen({ navigation, route }) {
+  const type = route.params?.type; // "glucose" | "insulin" | undefined (her ikisi)
+
   const [glucose, setGlucose] = useState("");
   const [insulin, setInsulin] = useState("");
   const [insulinType, setInsulinType] = useState("RAPID");
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // ── Validation ────────────────────────────────────────────────────
-  function validate() {
-    const glucoseVal = parseFloat(glucose);
-    const insulinVal = parseFloat(insulin);
+  const showGlucose = !type || type === "glucose";
+  const showInsulin = !type || type === "insulin";
 
-    if (glucose && (isNaN(glucoseVal) || glucoseVal <= 0)) {
+  function validate() {
+    if (showGlucose && type === "glucose" && !glucose) {
+      Alert.alert("Boş Alan", "Kan şekeri değeri girilmedi.");
+      return false;
+    }
+    if (showInsulin && type === "insulin" && !insulin) {
+      Alert.alert("Boş Alan", "İnsülin dozu girilmedi.");
+      return false;
+    }
+    if (glucose && (isNaN(parseFloat(glucose)) || parseFloat(glucose) <= 0)) {
       Alert.alert("Geçersiz Değer", "Kan şekeri pozitif bir sayı olmalıdır.");
       return false;
     }
-    if (insulin && (isNaN(insulinVal) || insulinVal <= 0)) {
+    if (insulin && (isNaN(parseFloat(insulin)) || parseFloat(insulin) <= 0)) {
       Alert.alert("Geçersiz Değer", "İnsülin dozu pozitif bir sayı olmalıdır.");
       return false;
     }
@@ -47,7 +54,6 @@ export default function DiabetesLogScreen({ navigation }) {
     return true;
   }
 
-  // ── Save ─────────────────────────────────────────────────────────
   async function handleSave() {
     if (!validate()) return;
 
@@ -55,32 +61,21 @@ export default function DiabetesLogScreen({ navigation }) {
     try {
       const promises = [];
 
-      if (glucose) {
+      if (showGlucose && glucose) {
         promises.push(
-          createGlucoseReading({
-            valueMgDl: parseFloat(glucose),
-            notes: notes.trim(),
-          }),
+          createGlucoseReading({ valueMgDl: parseFloat(glucose), notes: notes.trim() }),
         );
       }
-
-      if (insulin) {
+      if (showInsulin && insulin) {
         promises.push(
-          createInsulinDose({
-            units: parseFloat(insulin),
-            insulinType,
-            notes: notes.trim(),
-          }),
+          createInsulinDose({ units: parseFloat(insulin), insulinType, notes: notes.trim() }),
         );
       }
 
       await Promise.all(promises);
 
-      Alert.alert("Kaydedildi ✓", "Günlük kaydınız başarıyla eklendi.", [
-        {
-          text: "Tamam",
-          onPress: () => navigation.navigate(APP_ROUTES.DASHBOARD),
-        },
+      Alert.alert("Kaydedildi", "Günlük kaydınız başarıyla eklendi.", [
+        { text: "Tamam", onPress: () => navigation.navigate(APP_ROUTES.DASHBOARD) },
       ]);
     } catch (error) {
       Alert.alert("Kayıt Hatası", error.message || "Lütfen tekrar deneyin.");
@@ -89,7 +84,6 @@ export default function DiabetesLogScreen({ navigation }) {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -100,72 +94,61 @@ export default function DiabetesLogScreen({ navigation }) {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.pageTitle}>Günlük Ekle</Text>
-
-        {/* ── Glucose ─────────────────────────────────────────────── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>🩸 Kan Şekeri</Text>
-
-          <Text style={styles.label}>Değer (mg/dL)</Text>
-          <TextInput
-            style={styles.input}
-            value={glucose}
-            onChangeText={setGlucose}
-            keyboardType="decimal-pad"
-            placeholder="Örn: 120"
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-        </View>
-
-        {/* ── Insulin ─────────────────────────────────────────────── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>💉 İnsülin</Text>
-
-          <Text style={styles.label}>Doz (ünite)</Text>
-          <TextInput
-            style={styles.input}
-            value={insulin}
-            onChangeText={setInsulin}
-            keyboardType="decimal-pad"
-            placeholder="Örn: 4"
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-
-          <Text style={[styles.label, { marginTop: theme.spacing.md }]}>
-            İnsülin Tipi
-          </Text>
-          <View style={styles.typeRow}>
-            {INSULIN_TYPES.map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={[
-                  styles.typeChip,
-                  insulinType === type && styles.typeChipActive,
-                ]}
-                onPress={() => setInsulinType(type)}
-                activeOpacity={0.75}
-              >
-                <Text
-                  style={[
-                    styles.typeChipText,
-                    insulinType === type && styles.typeChipTextActive,
-                  ]}
-                >
-                  {type}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        {/* ── Glukoz ─────────────────────────────────────────────── */}
+        {showGlucose && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Kan Şekeri</Text>
+            <Text style={styles.label}>Değer (mg/dL)</Text>
+            <TextInput
+              style={styles.input}
+              value={glucose}
+              onChangeText={setGlucose}
+              keyboardType="decimal-pad"
+              placeholder="Örn: 120"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
           </View>
-        </View>
+        )}
 
-        {/* ── Notes ───────────────────────────────────────────────── */}
+        {/* ── İnsülin ─────────────────────────────────────────────── */}
+        {showInsulin && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>İnsülin</Text>
+            <Text style={styles.label}>Doz (ünite)</Text>
+            <TextInput
+              style={styles.input}
+              value={insulin}
+              onChangeText={setInsulin}
+              keyboardType="decimal-pad"
+              placeholder="Örn: 4"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+            <Text style={[styles.label, { marginTop: theme.spacing.md }]}>İnsülin Tipi</Text>
+            <View style={styles.typeRow}>
+              {INSULIN_TYPES.map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.typeChip, insulinType === t && styles.typeChipActive]}
+                  onPress={() => setInsulinType(t)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.typeChipText, insulinType === t && styles.typeChipTextActive]}>
+                    {t}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* ── Not ─────────────────────────────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>📝 İlaç / Not</Text>
+          <Text style={styles.cardTitle}>Not</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             value={notes}
             onChangeText={setNotes}
-            placeholder="Aldığın ilaç, belirti veya not…"
+            placeholder="Belirti veya ek not…"
             placeholderTextColor={theme.colors.textSecondary}
             multiline
             numberOfLines={3}
@@ -173,7 +156,6 @@ export default function DiabetesLogScreen({ navigation }) {
           />
         </View>
 
-        {/* ── Save button ──────────────────────────────────────────── */}
         <TouchableOpacity
           style={[styles.btnPrimary, isSaving && styles.btnDisabled]}
           onPress={handleSave}
@@ -192,18 +174,8 @@ export default function DiabetesLogScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: theme.colors.background },
-  scroll: {
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
-  },
+  scroll: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
 
-  pageTitle: {
-    ...theme.typography.heading,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.lg,
-  },
-
-  // Card
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: 16,
@@ -219,7 +191,6 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
 
-  // Fields
   label: {
     ...theme.typography.caption,
     color: theme.colors.textPrimary,
@@ -235,17 +206,9 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     backgroundColor: theme.colors.background,
   },
-  textArea: {
-    height: 90,
-    paddingTop: theme.spacing.sm,
-  },
+  textArea: { height: 90, paddingTop: theme.spacing.sm },
 
-  // Insulin type chips
-  typeRow: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    marginTop: theme.spacing.xs,
-  },
+  typeRow: { flexDirection: "row", gap: theme.spacing.sm, marginTop: theme.spacing.xs },
   typeChip: {
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
@@ -254,19 +217,10 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.background,
   },
-  typeChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  typeChipText: {
-    ...theme.typography.caption,
-    color: theme.colors.textSecondary,
-  },
-  typeChipTextActive: {
-    color: theme.colors.surface,
-  },
+  typeChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  typeChipText: { ...theme.typography.caption, color: theme.colors.textSecondary },
+  typeChipTextActive: { color: theme.colors.surface },
 
-  // Button
   btnPrimary: {
     backgroundColor: theme.colors.primary,
     borderRadius: 14,
@@ -275,11 +229,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: theme.spacing.md,
   },
-  btnText: {
-    color: theme.colors.surface,
-    ...theme.typography.button,
-  },
-  btnDisabled: {
-    opacity: 0.5,
-  },
+  btnText: { color: theme.colors.surface, ...theme.typography.button },
+  btnDisabled: { opacity: 0.5 },
 });
