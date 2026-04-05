@@ -24,10 +24,10 @@ export async function register(email, password, firstName, lastName, phone) {
   });
 }
 
-/**
- * GET /api/v1/auth/me
- * Returns UserResponse { id, email, firstName, lastName, ... }
- */
 export async function me() {
   return api.get(`${AUTH_BASE}/me`);
+}
+
+export async function updateMe(data) {
+  return api.put(`${AUTH_BASE}/me`, data);
 }
