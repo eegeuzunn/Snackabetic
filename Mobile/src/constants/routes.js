@@ -5,7 +5,7 @@ export const AUTH_ROUTES = {
 
 export const APP_ROUTES = {
   DASHBOARD: "Home",
-  CAMERA: "Camera",
+  ADD_MEAL: "AddMeal",
   HISTORY: "History",
   SETTINGS: "Settings",
   PREDICTION_RESULT: "PredictionResult",
@@ -14,4 +14,6 @@ export const APP_ROUTES = {
 
 export const STACK_ROUTES = {
   EDIT_PROFILE: "EditProfile",
+  ADD_MEAL: "AddMeal",
+  CAMERA: "Camera",
 };
