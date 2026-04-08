@@ -1,4 +1,5 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import React, { useRef, useState } from "react";
 import {
@@ -22,6 +23,14 @@ export default function CameraScreen({ navigation, route }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const cameraRef = useRef(null);
 
+  function handleCancel() {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate(APP_ROUTES.ADD_MEAL);
+  }
+
   // ── Permission gate ────────────────────────────────────────────────
   if (!permission) {
     return (
@@ -34,6 +43,10 @@ export default function CameraScreen({ navigation, route }) {
   if (!permission.granted) {
     return (
       <View style={styles.centered}>
+        <TouchableOpacity style={styles.topCancelBtn} onPress={handleCancel}>
+          <Feather name="arrow-left" size={14} color="#fff" />
+          <Text style={styles.topCancelBtnText}>Geri</Text>
+        </TouchableOpacity>
         <Text style={styles.permissionText}>
           Kamera erişimi gerekli. Lütfen izin verin.
         </Text>
@@ -71,7 +84,12 @@ export default function CameraScreen({ navigation, route }) {
     try {
       const prediction = await analyzeImage(photoUri);
       // Navigate to PredictionResultScreen with the result and image
-      navigation.navigate(APP_ROUTES.PREDICTION_RESULT, { prediction, photoUri, mealType, returnToMeal });
+      navigation.navigate(APP_ROUTES.PREDICTION_RESULT, {
+        prediction,
+        photoUri,
+        mealType,
+        returnToMeal,
+      });
     } catch (error) {
       Alert.alert("Analiz Hatası", error.message || "Lütfen tekrar deneyin.");
     } finally {
@@ -87,6 +105,14 @@ export default function CameraScreen({ navigation, route }) {
   if (photoUri) {
     return (
       <View style={styles.previewContainer}>
+        <TouchableOpacity
+          style={styles.topCancelBtn}
+          onPress={handleCancel}
+          disabled={isAnalyzing}
+        >
+          <Feather name="x" size={14} color="#fff" />
+          <Text style={styles.topCancelBtnText}>İptal</Text>
+        </TouchableOpacity>
         <Image source={{ uri: photoUri }} style={styles.previewImage} />
 
         {isAnalyzing ? (
@@ -121,6 +147,11 @@ export default function CameraScreen({ navigation, route }) {
   return (
     <View style={styles.cameraContainer}>
       <CameraView ref={cameraRef} style={styles.camera} facing="back" />
+
+      <TouchableOpacity style={styles.topCancelBtn} onPress={handleCancel}>
+        <Feather name="x" size={14} color="#fff" />
+        <Text style={styles.topCancelBtnText}>İptal</Text>
+      </TouchableOpacity>
 
       <View style={styles.cameraControls}>
         <TouchableOpacity style={styles.galleryBtn} onPress={pickFromGallery}>
@@ -177,6 +208,26 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
+  },
+  topCancelBtn: {
+    position: "absolute",
+    top: 56,
+    left: theme.spacing.lg,
+    zIndex: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
+    borderRadius: 999,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+  },
+  topCancelBtnText: {
+    color: "#fff",
+    ...theme.typography.caption,
+    fontFamily: "Outfit_600SemiBold",
+    marginLeft: 6,
   },
   cameraControls: {
     position: "absolute",

@@ -23,7 +23,7 @@ import os, io, json, logging, time
 import numpy as np
 from pathlib import Path
 from flask import Flask, request, jsonify
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -433,8 +433,13 @@ def analyze():
         top_k      = int(request.form.get("top_k", 5))
 
         # ── Görüntü yükle ─────────────────────────────────────────────────────
-        raw      = request.files["image"].read()
-        pil_img  = Image.open(io.BytesIO(raw)).convert("RGB")
+        raw = request.files["image"].read()
+        try:
+            pil_img = Image.open(io.BytesIO(raw)).convert("RGB")
+        except UnidentifiedImageError:
+            return jsonify({
+                "error": "Yüklenen dosya geçerli bir resim değil veya desteklenmeyen formatta. JPEG/PNG deneyin."
+            }), 400
 
         # Performans için boyutu sınırla
         max_dim = 518

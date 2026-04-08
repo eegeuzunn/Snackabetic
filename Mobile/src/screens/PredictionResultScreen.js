@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Feather } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
@@ -27,7 +28,13 @@ function useDebounce(value, delay = 400) {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function PredictionResultScreen({ route, navigation }) {
-  const { prediction, photoUri, mealType = "SNACK", manual = false, returnToMeal = false } = route.params ?? {};
+  const {
+    prediction,
+    photoUri,
+    mealType = "SNACK",
+    manual = false,
+    returnToMeal = false,
+  } = route.params ?? {};
 
   // ── State ────────────────────────────────────────────────────────────
   const [mode, setMode] = useState(manual ? "edit" : "review"); // "review" | "edit"
@@ -77,6 +84,16 @@ export default function PredictionResultScreen({ route, navigation }) {
     setTimeout(() => searchInputRef.current?.focus(), 100);
   }
 
+  function handleCancel() {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate(
+      returnToMeal ? APP_ROUTES.ADD_MEAL : APP_ROUTES.DASHBOARD,
+    );
+  }
+
   // ── Select a food from search results ───────────────────────────────
   const selectFood = useCallback((food) => {
     setSelectedFood({ id: food.id, name: food.name });
@@ -107,10 +124,22 @@ export default function PredictionResultScreen({ route, navigation }) {
           caloriesPer100g: selectedFood.caloriesPer100g ?? 0,
           proteinPer100g: selectedFood.proteinPer100g ?? 0,
           fatPer100g: selectedFood.fatPer100g ?? 0,
-          carbsG: selectedFood.carbsPer100g != null ? +(selectedFood.carbsPer100g * parsedGram / 100).toFixed(1) : 0,
-          calories: selectedFood.caloriesPer100g != null ? +(selectedFood.caloriesPer100g * parsedGram / 100).toFixed(1) : 0,
-          proteinG: selectedFood.proteinPer100g != null ? +(selectedFood.proteinPer100g * parsedGram / 100).toFixed(1) : 0,
-          fatG: selectedFood.fatPer100g != null ? +(selectedFood.fatPer100g * parsedGram / 100).toFixed(1) : 0,
+          carbsG:
+            selectedFood.carbsPer100g != null
+              ? +((selectedFood.carbsPer100g * parsedGram) / 100).toFixed(1)
+              : 0,
+          calories:
+            selectedFood.caloriesPer100g != null
+              ? +((selectedFood.caloriesPer100g * parsedGram) / 100).toFixed(1)
+              : 0,
+          proteinG:
+            selectedFood.proteinPer100g != null
+              ? +((selectedFood.proteinPer100g * parsedGram) / 100).toFixed(1)
+              : 0,
+          fatG:
+            selectedFood.fatPer100g != null
+              ? +((selectedFood.fatPer100g * parsedGram) / 100).toFixed(1)
+              : 0,
         },
       });
       return;
@@ -118,9 +147,15 @@ export default function PredictionResultScreen({ route, navigation }) {
 
     setIsSaving(true);
     try {
-      await createMeal({ items: [{ foodId: selectedFood.id, amountGrams: parsedGram }], mealType });
+      await createMeal({
+        items: [{ foodId: selectedFood.id, amountGrams: parsedGram }],
+        mealType,
+      });
       Alert.alert("Kaydedildi", "Öğün başarıyla eklendi.", [
-        { text: "Tamam", onPress: () => navigation.navigate(APP_ROUTES.DASHBOARD) },
+        {
+          text: "Tamam",
+          onPress: () => navigation.navigate(APP_ROUTES.DASHBOARD),
+        },
       ]);
     } catch (error) {
       Alert.alert("Kayıt Hatası", error.message || "Lütfen tekrar deneyin.");
@@ -158,9 +193,7 @@ export default function PredictionResultScreen({ route, navigation }) {
     return (
       <View style={styles.container}>
         {/* Photo */}
-        {photoUri && (
-          <Image source={{ uri: photoUri }} style={styles.photo} />
-        )}
+        {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} />}
 
         {/* Prediction card */}
         <View style={styles.card}>
@@ -170,9 +203,18 @@ export default function PredictionResultScreen({ route, navigation }) {
           </Text>
 
           <View style={styles.statsRow}>
-            <StatBox label="Tahmini Ağırlık" value={`${prediction?.weightG ?? 0} g`} />
-            <StatBox label="Karbonhidrat" value={`${prediction?.carbsG ?? 0} g`} />
-            <StatBox label="Kalori" value={`${prediction?.calories ?? 0} kcal`} />
+            <StatBox
+              label="Tahmini Ağırlık"
+              value={`${prediction?.weightG ?? 0} g`}
+            />
+            <StatBox
+              label="Karbonhidrat"
+              value={`${prediction?.carbsG ?? 0} g`}
+            />
+            <StatBox
+              label="Kalori"
+              value={`${prediction?.calories ?? 0} kcal`}
+            />
           </View>
         </View>
 
@@ -187,6 +229,19 @@ export default function PredictionResultScreen({ route, navigation }) {
             disabled={isSaving}
           >
             <Text style={styles.btnText}>Onayla / Düzelt</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.btnSecondary}
+            onPress={handleCancel}
+            disabled={isSaving}
+          >
+            <Feather
+              name="arrow-left"
+              size={16}
+              color={theme.colors.textSecondary}
+            />
+            <Text style={styles.btnSecondaryText}>İptal</Text>
           </TouchableOpacity>
         </View>
 
@@ -253,9 +308,7 @@ export default function PredictionResultScreen({ route, navigation }) {
       />
 
       {selectedFood && (
-        <Text style={styles.selectedNote}>
-          ✓ Seçili: {selectedFood.name}
-        </Text>
+        <Text style={styles.selectedNote}>✓ Seçili: {selectedFood.name}</Text>
       )}
 
       {/* Save */}
@@ -271,15 +324,22 @@ export default function PredictionResultScreen({ route, navigation }) {
         {isSaving ? (
           <ActivityIndicator color={theme.colors.surface} />
         ) : (
-          <Text style={styles.btnText}>{returnToMeal ? "Öğüne Ekle" : "Kaydet"}</Text>
+          <Text style={styles.btnText}>
+            {returnToMeal ? "Öğüne Ekle" : "Kaydet"}
+          </Text>
         )}
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.btnSecondary}
-        onPress={() => manual ? navigation.goBack() : setMode("review")}
+        onPress={() => (manual ? navigation.goBack() : setMode("review"))}
         disabled={isSaving}
       >
+        <Feather
+          name="arrow-left"
+          size={16}
+          color={theme.colors.textSecondary}
+        />
         <Text style={styles.btnSecondaryText}>Geri Dön</Text>
       </TouchableOpacity>
     </View>
@@ -450,6 +510,7 @@ const styles = StyleSheet.create({
   btnSecondary: {
     marginTop: theme.spacing.md,
     minHeight: 52,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 14,
@@ -459,5 +520,6 @@ const styles = StyleSheet.create({
   btnSecondaryText: {
     ...theme.typography.caption,
     color: theme.colors.textSecondary,
+    marginLeft: theme.spacing.xs,
   },
 });

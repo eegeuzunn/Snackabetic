@@ -1,3 +1,4 @@
+import * as ImageManipulator from "expo-image-manipulator";
 import { AI_SERVICE_URL } from "../constants/config";
 
 /**
@@ -12,15 +13,23 @@ import { AI_SERVICE_URL } from "../constants/config";
  * }
  */
 export async function analyzeImage(imageUri) {
-  const filename = imageUri.split("/").pop();
-  const ext = filename.split(".").pop().toLowerCase();
-  const mimeType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
+  const normalized = await ImageManipulator.manipulateAsync(
+    imageUri,
+    [{ resize: { width: 1600 } }],
+    {
+      compress: 0.85,
+      format: ImageManipulator.SaveFormat.JPEG,
+    },
+  );
+
+  const uploadUri = normalized.uri;
+  const filename = "snackabetic-photo.jpg";
 
   const formData = new FormData();
   formData.append("image", {
-    uri: imageUri,
+    uri: uploadUri,
     name: filename,
-    type: mimeType,
+    type: "image/jpeg",
   });
 
   let response;
@@ -31,7 +40,7 @@ export async function analyzeImage(imageUri) {
     });
   } catch (networkError) {
     throw new Error(
-      `AI servisine ulaşılamadı (${AI_SERVICE_URL}). Servisin çalıştığından emin olun.`
+      `AI servisine ulaşılamadı (${AI_SERVICE_URL}). Servisin çalıştığından emin olun.`,
     );
   }
 
