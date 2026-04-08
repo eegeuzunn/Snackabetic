@@ -36,21 +36,13 @@ export default function PredictionResultScreen({ route, navigation }) {
     returnToMeal = false,
   } = route.params ?? {};
 
-  const isLowConfidence = (prediction?.confidenceLevel ?? "low") === "low";
-
   // ── State ────────────────────────────────────────────────────────────
-  const [mode, setMode] = useState(
-    manual ? "edit" : isLowConfidence ? "blocked" : "review",
-  ); // "review" | "edit" | "blocked"
+  const [mode, setMode] = useState(manual ? "edit" : "review"); // "review" | "edit"
 
   // Editable values (start with AI prediction)
-  const [gram, setGram] = useState(
-    String(!isLowConfidence && !manual ? (prediction?.weightG ?? "") : ""),
-  );
+  const [gram, setGram] = useState(String(prediction?.weightG ?? ""));
   const [selectedFood, setSelectedFood] = useState(null); // { id, name }
-  const [searchQuery, setSearchQuery] = useState(
-    !isLowConfidence && !manual ? (prediction?.foodName ?? "") : "",
-  );
+  const [searchQuery, setSearchQuery] = useState(prediction?.foodName ?? "");
 
   // Food search
   const [searchResults, setSearchResults] = useState([]);
@@ -88,17 +80,8 @@ export default function PredictionResultScreen({ route, navigation }) {
   // ── Enter edit mode ──────────────────────────────────────────────────
   function enterEditMode() {
     setMode("edit");
-    if (isLowConfidence) {
-      setSearchQuery("");
-      setGram("");
-      setSelectedFood(null);
-    }
     // Trigger initial search with AI food name
     setTimeout(() => searchInputRef.current?.focus(), 100);
-  }
-
-  function goToManualAdd() {
-    navigation.navigate(APP_ROUTES.ADD_MEAL);
   }
 
   function handleCancel() {
@@ -206,41 +189,6 @@ export default function PredictionResultScreen({ route, navigation }) {
   // ════════════════════════════════════════════════════════════════════
   //  REVIEW MODE
   // ════════════════════════════════════════════════════════════════════
-  if (mode === "blocked") {
-    return (
-      <View style={styles.container}>
-        {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} />}
-
-        <View style={styles.blockedCard}>
-          <Text style={styles.blockedTitle}>Yemek henüz tanımlanamıyor</Text>
-          <Text style={styles.blockedBody}>
-            Bu görüntü için model yeterince güvenli bir eşleşme bulamadı. Yakın
-            zamanda desteklenecek. Lütfen manuel ekleme yapın veya tekrar çekin.
-          </Text>
-          <Text style={styles.blockedHint}>
-            İsterseniz bir talep oluşturarak bu yemeğin sisteme eklenmesini
-            sağlayabilirsiniz.
-          </Text>
-        </View>
-
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.btnPrimary} onPress={goToManualAdd}>
-            <Text style={styles.btnText}>Manuel Olarak Ekle</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.btnSecondary} onPress={handleCancel}>
-            <Feather
-              name="camera"
-              size={16}
-              color={theme.colors.textSecondary}
-            />
-            <Text style={styles.btnSecondaryText}>Tekrar Dene</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   if (mode === "review") {
     return (
       <View style={styles.container}>
@@ -433,30 +381,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     marginBottom: theme.spacing.lg,
-  },
-  blockedCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 16,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.lg,
-  },
-  blockedTitle: {
-    ...theme.typography.heading,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.sm,
-  },
-  blockedBody: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    lineHeight: 22,
-  },
-  blockedHint: {
-    ...theme.typography.caption,
-    color: theme.colors.primary,
-    marginTop: theme.spacing.md,
-    lineHeight: 18,
   },
   cardLabel: {
     ...theme.typography.caption,
