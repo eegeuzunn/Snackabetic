@@ -1,20 +1,23 @@
 """
-Snackabetic - Birleşik AI Servisi
-===================================
+Snackabetic - Birleşik AI Servisi  (v2)
+========================================
 Tek endpoint'e resim gönder → yemek adı + gram + kalori + karbonhidrat döner.
 
 Akış:
-  1. EfficientNet-B3  → yemeği tanır  ("lahmacun", %87)
-  2. Depth Anything V2 → derinlik haritası → hacim → gram
-  3. Veritabanı        → kalori + karbonhidrat hesaplar
+    1. EfficientNet-B3      → yemeği tanır  ("lahmacun", %87)
+    2. Kategori tespiti     → flat / volumetric / soup / drink / fruit
+    3a. Flat yemekler   s    → Pure 2D alan × sabit kalınlık  (depth map kullanılmaz)
+    3b. Volumetric yemekler → Depth Anything V2 + constrained height
+    3c. Soup / drink        → Sabit porsiyon (kase/bardak)
+    4. Veritabanı           → kalori + karbonhidrat hesaplar
 
 Kurulum:
-  pip install flask torch torchvision transformers pillow numpy scipy
+    pip install flask torch torchvision transformers pillow numpy scipy opencv-python
 
 Çalıştırma:
-  python snackabetic_service.py
+    python snackabetic_service.py
 
-    Gerekli dosyalar (varsayılan olarak Ai/models/ klasöründe olmalı):
+Gerekli dosyalar (varsayılan olarak bu dosyanın yanındaki models/ klasöründe):
     - best_model.pth       (EfficientNet ağırlıkları)
     - class_mapping.json   (idx → sınıf ismi eşleşmesi)
 """
@@ -37,11 +40,10 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # ─── DOSYA YOLLARI ────────────────────────────────────────────────────────────
-# MODELS_DIR env varsa onu kullanır, yoksa bu dosyanın yanındaki models/ klasörünü kullanır
 DEFAULT_MODELS_DIR = Path(__file__).resolve().parent / "models"
-MODELS_DIR     = Path(os.environ.get("MODELS_DIR", str(DEFAULT_MODELS_DIR))).expanduser().resolve()
-MODEL_PATH     = MODELS_DIR / "best_model.pth"
-MAPPING_PATH   = MODELS_DIR / "class_mapping.json"
+MODELS_DIR   = Path(os.environ.get("MODELS_DIR", str(DEFAULT_MODELS_DIR))).expanduser().resolve()
+MODEL_PATH   = MODELS_DIR / "best_model.pth"
+MAPPING_PATH = MODELS_DIR / "class_mapping.json"
 
 # ─── KALORİ & KARBONHİDRAT VERİTABANI (100g başına) ─────────────────────────
 # format: "yemek_adi": (kalori, karbonhidrat_g, protein_g, yag_g, yogunluk_g_per_ml)
@@ -161,19 +163,153 @@ NUTRITION_DB = {
     "kivi":     (61,15.0,1.1,0.5,0.90), "mango": (60,15.0,0.8,0.4,0.90),
     "avokado":  (160, 9.0,2.0,15.0,0.85),
 }
-DEFAULT_NUTRITION = (200, 20.0, 10.0, 8.0, 0.90)  # bilinmeyen yemek
+DEFAULT_NUTRITION = (200, 20.0, 10.0, 8.0, 0.90)
+
+# ─── YEMEk ŞEKİL PROFİLLERİ ──────────────────────────────────────────────────
+# Kategori: "flat" | "volumetric" | "soup" | "drink" | "fruit"
+#
+# flat:       Pure 2D alan × sabit kalınlık → depth map yok
+# volumetric: 2D alan × depth haritasından gelen yükseklik
+# soup:       Sabit kase/tabak porsiyonu (250-400 ml arası)
+# drink:      Sabit bardak porsiyonu
+# fruit:      Basit 3D küre / elipsoid tahmini
+#
+# Tuple: (min_g, max_g, thickness_cm_or_None, category)
+#   thickness_cm → flat yemekler için sabit kalınlık
+#   None         → depth map kullanılır (volumetric) veya sabit porsiyon
+FOOD_SHAPE_PROFILES = {
+    # ── Flat (sadece alan × kalınlık) ────────────────────────────────────────
+    "lahmacun":           (130, 250,  0.30, "flat"),
+    "pizza":              (80,  300,  1.50, "flat"),   # tek dilim
+    "omlet":              (80,  220,  1.40, "flat"),
+    "omelette":           (80,  220,  1.40, "flat"),
+    "pancakes":           (60,  200,  1.20, "flat"),
+    "waffles":            (80,  220,  2.00, "flat"),
+    "french_toast":       (80,  220,  2.50, "flat"),
+    "kiymali-pide":       (150, 350,  1.50, "flat"),
+    "su-boregi":          (100, 300,  2.00, "flat"),
+    "kiymali-borek":      (100, 280,  2.00, "flat"),
+    "peynirli-borek":     (100, 280,  2.00, "flat"),
+    # ── Volumetric (depth map + constrained height) ───────────────────────────
+    "pilav":              (100, 400,  None, "volumetric"),
+    "bulgur-pilavi":      (100, 350,  None, "volumetric"),
+    "salcali-makarna":    (150, 450,  None, "volumetric"),
+    "yogurtlu-makarna":   (150, 450,  None, "volumetric"),
+    "manti":              (150, 450,  None, "volumetric"),
+    "karniyarik":         (150, 400,  None, "volumetric"),
+    "hunkar-begendi":     (150, 400,  None, "volumetric"),
+    "menemen":            (100, 350,  None, "volumetric"),
+    "kabak-mucver":       (100, 300,  None, "volumetric"),
+    "yaprak-sarma":       (100, 350,  None, "volumetric"),
+    "biber-dolma":        (150, 400,  None, "volumetric"),
+    "midye-dolma":        (100, 300,  None, "volumetric"),
+    "ispanak-yemegi":     (150, 400,  None, "volumetric"),
+    "zeytinyagli-fasulye":(150, 400,  None, "volumetric"),
+    "sulu-kuru-fasulye-yemegi": (200, 450, None, "volumetric"),
+    "sulu-barbunya-yemegi":     (200, 450, None, "volumetric"),
+    "sulu-bezelye-yemegi":      (150, 400, None, "volumetric"),
+    "sulu-nohut-yemegi":        (150, 400, None, "volumetric"),
+    "sulu-bamya-yemegi":        (150, 400, None, "volumetric"),
+    "coban-salatasi":     (100, 300,  None, "volumetric"),
+    "kisir":              (100, 300,  None, "volumetric"),
+    "cacik":              (100, 250,  None, "volumetric"),
+    "tursu":              ( 50, 200,  None, "volumetric"),
+    "patates-puresi":     (150, 400,  None, "volumetric"),
+    "patates-kizartmasi": (100, 350,  None, "volumetric"),
+    "patates-salatasi":   (100, 300,  None, "volumetric"),
+    "hamburger":          (150, 400,  None, "volumetric"),
+    "hot_dog":            (100, 250,  None, "volumetric"),
+    "doner":              (150, 400,  None, "volumetric"),
+    "iskender":           (200, 500,  None, "volumetric"),
+    "adana-kebap":        (150, 400,  None, "volumetric"),
+    "tas-kebabi":         (150, 400,  None, "volumetric"),
+    "patlican-kebabi":    (150, 400,  None, "volumetric"),
+    "steak":              (150, 450,  None, "volumetric"),
+    "grilled_salmon":     (100, 350,  None, "volumetric"),
+    "hamsi-tava":         (100, 300,  None, "volumetric"),
+    "levrek":             (150, 400,  None, "volumetric"),
+    "cipura":             (150, 400,  None, "volumetric"),
+    "chicken_wings":      (100, 350,  None, "volumetric"),
+    "french_fries":       (100, 350,  None, "volumetric"),
+    "onion_rings":        (100, 300,  None, "volumetric"),
+    "falafel":            (100, 300,  None, "volumetric"),
+    "sushi":              (100, 350,  None, "volumetric"),
+    "caesar_salad":       (100, 350,  None, "volumetric"),
+    "greek_salad":        (100, 350,  None, "volumetric"),
+    "hummus":             ( 50, 200,  None, "volumetric"),
+    "tacos":              (100, 300,  None, "volumetric"),
+    "churros":            ( 50, 200,  None, "volumetric"),
+    "spaghetti_bolognese":(150, 450,  None, "volumetric"),
+    "spaghetti_carbonara":(150, 450,  None, "volumetric"),
+    "lasagna":            (150, 450,  None, "volumetric"),
+    "club_sandwich":      (100, 350,  None, "volumetric"),
+    "grilled_cheese_sandwich": (100, 300, None, "volumetric"),
+    "cheesecake":         ( 80, 200,  None, "volumetric"),
+    "tiramisu":           ( 80, 200,  None, "volumetric"),
+    "chocolate_cake":     ( 80, 200,  None, "volumetric"),
+    "apple_pie":          ( 80, 250,  None, "volumetric"),
+    "ice_cream":          (100, 300,  None, "volumetric"),
+    "frozen_yogurt":      (100, 300,  None, "volumetric"),
+    "donuts":             ( 40, 120,  None, "volumetric"),
+    "baklava":            ( 60, 200,  None, "volumetric"),
+    "kazandibi":          (100, 250,  None, "volumetric"),
+    "sutlac":             (150, 300,  None, "volumetric"),
+    "tulumba-tatlisi":    ( 80, 250,  None, "volumetric"),
+    "kalburabasti":       ( 80, 250,  None, "volumetric"),
+    "kemal-pasa-tatlisi": ( 80, 250,  None, "volumetric"),
+    "lokma":              ( 50, 200,  None, "volumetric"),
+    "dondurma":           (100, 300,  None, "volumetric"),
+    "cig-kofte":          ( 50, 200,  None, "volumetric"),
+    "icli-kofte":         (100, 350,  None, "volumetric"),
+    "mercimek-koftesi":   (100, 300,  None, "volumetric"),
+    "anne-koftesi":       (100, 350,  None, "volumetric"),
+    "kokorec":            (100, 300,  None, "volumetric"),
+    "tantuni":            (150, 350,  None, "volumetric"),
+    "sucuklu-yumurta":    ( 80, 250,  None, "volumetric"),
+    "haslanmis-yumurta":  ( 40, 120,  None, "volumetric"),
+    "yogurt":             (100, 250,  None, "volumetric"),
+    "midye-tava":         (100, 300,  None, "volumetric"),
+    "canak-enginar":      (100, 300,  None, "volumetric"),
+    "et-sote":            (150, 400,  None, "volumetric"),
+    "tavuk-sote":         (150, 400,  None, "volumetric"),
+    # ── Soup (sabit porsiyon: büyük kase ~350g) ───────────────────────────────
+    "mercimek-corbasi":   (200, 400,  None, "soup"),
+    "domates-corbasi":    (200, 400,  None, "soup"),
+    "tarhana-corbasi":    (200, 400,  None, "soup"),
+    "yayla-corbasi":      (200, 400,  None, "soup"),
+    "sehriye-corbasi":    (200, 400,  None, "soup"),
+    # ── Drink (sabit porsiyon) ────────────────────────────────────────────────
+    "ayran":              (200, 300,  None, "drink"),
+    "turk-kahvesi":       ( 60, 100,  None, "drink"),
+    "cay":                (150, 200,  None, "drink"),
+    "sahlep":             (200, 300,  None, "drink"),
+    # ── Fruit (basit küre / elipsoid) ─────────────────────────────────────────
+    "portakal": (130, 250,  None, "fruit"),
+    "elma":     (120, 250,  None, "fruit"),
+    "armut":    (120, 250,  None, "fruit"),
+    "muz":      (80,  200,  None, "fruit"),
+    "uzum":     (80,  300,  None, "fruit"),
+    "cilek":    (50,  200,  None, "fruit"),
+    "kiraz":    (50,  200,  None, "fruit"),
+    "erik":     (50,  150,  None, "fruit"),
+    "seftali":  (100, 200,  None, "fruit"),
+    "kayisi":   (40,  100,  None, "fruit"),
+    "incir":    (40,  100,  None, "fruit"),
+    "kavun":    (200, 600,  None, "fruit"),
+    "karpuz":   (300, 1000, None, "fruit"),
+    "nar":      (150, 300,  None, "fruit"),
+    "kivi":     (60,  120,  None, "fruit"),
+    "mango":    (200, 400,  None, "fruit"),
+    "avokado":  (150, 300,  None, "fruit"),
+}
 
 
 # ─── 1. EFFICİENTNET MODELİ ───────────────────────────────────────────────────
 class FoodClassifier:
-    """
-    Eğitilmiş EfficientNet-B3 modelini yükler ve inference yapar.
-    Notebook'taki aynı mimari — best_model.pth + class_mapping.json gerekir.
-    """
     def __init__(self):
-        self.model     = None
+        self.model        = None
         self.idx_to_class = {}
-        self.transform = transforms.Compose([
+        self.transform    = transforms.Compose([
             transforms.Resize((224, 224)),
             transforms.CenterCrop((224, 224)),
             transforms.ToTensor(),
@@ -195,16 +331,11 @@ class FoodClassifier:
             logger.error(f"❌ Class mapping bulunamadı: {MAPPING_PATH}")
             return
 
-        # class_mapping.json yükle
         with open(MAPPING_PATH, "r", encoding="utf-8") as f:
             mapping = json.load(f)
-        # idx_to_class'ın key'leri string olabilir, int'e çeviriyoruz
-        self.idx_to_class = {
-            int(k): v for k, v in mapping["idx_to_class"].items()
-        }
+        self.idx_to_class = {int(k): v for k, v in mapping["idx_to_class"].items()}
         num_classes = len(self.idx_to_class)
 
-        # Notebook'takiyle aynı mimari
         net = models.efficientnet_b3(weights=None)
         in_features = net.classifier[1].in_features
         net.classifier = nn.Sequential(
@@ -223,16 +354,13 @@ class FoodClassifier:
         logger.info(f"✅ EfficientNet-B3 yüklendi — {num_classes} sınıf, device: {self.device}")
 
     def predict(self, pil_image: Image.Image, top_k: int = 5):
-        """
-        Returns: [(food_name, confidence), ...]  en yüksek olasılıklı top_k sonuç
-        """
         if self.model is None:
             raise RuntimeError("Model yüklenemedi!")
 
         img_tensor = self.transform(pil_image).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            output = self.model(img_tensor)
-            probs  = torch.softmax(output, dim=1)[0]
+            output    = self.model(img_tensor)
+            probs     = torch.softmax(output, dim=1)[0]
             top_probs, top_indices = probs.topk(top_k)
 
         return [
@@ -243,11 +371,10 @@ class FoodClassifier:
 
 # ─── 2. DEPTH ESTIMATION MODELİ ───────────────────────────────────────────────
 class DepthEstimator:
-    """Depth Anything V2 (Small) — HuggingFace üzerinden."""
     def __init__(self):
-        self.pipe   = None
-        self.midas  = None
-        self.mode   = None
+        self.pipe  = None
+        self.midas = None
+        self.mode  = None
         self._load()
 
     def _load(self):
@@ -256,7 +383,7 @@ class DepthEstimator:
             self.pipe = hf_pipeline(
                 task="depth-estimation",
                 model="depth-anything/Depth-Anything-V2-Small-hf",
-                device=-1,  # CPU (MPS transformers desteği sınırlı)
+                device=-1,
             )
             self.mode = "depth_anything"
             logger.info("✅ Depth Anything V2 (Small) yüklendi")
@@ -266,21 +393,21 @@ class DepthEstimator:
                 self.midas = torch.hub.load("intel-isl/MiDaS", "MiDaS_small")
                 self.midas.eval()
                 midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
-                self.transform = midas_transforms.small_transform
+                self.midas_transform = midas_transforms.small_transform
                 self.mode = "midas"
                 logger.info("✅ MiDaS Small yüklendi (fallback)")
             except Exception as e2:
                 logger.error(f"Hiçbir depth modeli yüklenemedi: {e2}")
 
     def predict(self, pil_image: Image.Image) -> np.ndarray:
-        """Normalize derinlik haritası döner — shape [H,W], 0=uzak 1=yakın."""
+        """Normalize edilmiş derinlik haritası döner [H,W], 0=uzak 1=yakın."""
         if self.mode == "depth_anything":
             result = self.pipe(pil_image)
             depth  = np.array(result["depth"], dtype=np.float32)
         elif self.mode == "midas":
             import cv2
             img = np.array(pil_image.convert("RGB"))
-            inp = self.transform(img)
+            inp = self.midas_transform(img)
             with torch.no_grad():
                 pred = self.midas(inp)
                 pred = F.interpolate(
@@ -289,7 +416,6 @@ class DepthEstimator:
                 ).squeeze()
             depth = pred.numpy().astype(np.float32)
         else:
-            # Depth modeli yoksa düz bir harita döndür (en kötü durum)
             w, h  = pil_image.size
             depth = np.ones((h, w), dtype=np.float32) * 0.5
 
@@ -299,25 +425,99 @@ class DepthEstimator:
         return depth
 
 
-# ─── 3. PORSIYON HESAPLAMA ────────────────────────────────────────────────────
-def estimate_weight(
-    depth_map: np.ndarray,
-    pil_image: Image.Image,
-    density: float,
-    camera_height_cm: float = 30.0,
-    plate_diameter_cm: float = None,
-) -> tuple[float, float, float]:
+# ─── 3. YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────
+def _get_food_mask(img_arr: np.ndarray) -> np.ndarray:
+    """HSV tabanlı yemek maskesi döner (bool array)."""
+    import cv2
+    h, w = img_arr.shape[:2]
+    img_hsv  = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
+    sat, bri = img_hsv[:, :, 1], img_hsv[:, :, 2]
+    mask = (sat > 25) & (bri > 30) & (bri < 240)
+    mask = ndimage.binary_erosion(mask, iterations=1)
+    mask = ndimage.binary_dilation(mask, iterations=2)
+
+    labeled, n = ndimage.label(mask)
+    if n == 0:
+        return np.ones((h, w), dtype=bool)
+
+    cy, cx     = h // 2, w // 2
+    center_lbl = labeled[cy, cx]
+    if center_lbl == 0:
+        sizes      = ndimage.sum(mask, labeled, range(1, n + 1))
+        center_lbl = int(np.argmax(sizes)) + 1
+    return labeled == center_lbl
+
+
+def _detect_plate(img_arr: np.ndarray):
     """
-    Derinlik haritası → hacim (ml) → gram.
-    Returns: (volume_ml, weight_g, food_pixel_ratio)
+    HoughCircles ile tabak tespit eder.
+    Döner: (plate_px_diameter, plate_center) veya (None, None)
+    """
+    import cv2
+    h, w = img_arr.shape[:2]
+    gray = cv2.cvtColor(img_arr, cv2.COLOR_RGB2GRAY)
+    gray = cv2.medianBlur(gray, 5)
+    try:
+        circles = cv2.HoughCircles(
+            gray, cv2.HOUGH_GRADIENT, dp=1.2, minDist=max(h, w) // 8,
+            param1=100, param2=30,
+            minRadius=int(min(w, h) * 0.12), maxRadius=int(min(w, h) * 0.60),
+        )
+        if circles is not None:
+            circles = np.round(circles[0, :]).astype(int)
+            cx, cy  = w // 2, h // 2
+            best    = min(circles, key=lambda c: (c[0] - cx) ** 2 + (c[1] - cy) ** 2)
+            return int(best[2] * 2), (int(best[0]), int(best[1]))
+    except Exception:
+        pass
+    return None, None
+
+
+def _get_scale(img_w: int, plate_px_diameter, plate_diameter_cm, camera_height_cm: float):
+    """
+    cm_per_px ve scale_confidence döner.
+    Öncelik: kullanıcı + tespit > sadece tespit > FOV tahmini
+    """
+    if plate_px_diameter and plate_diameter_cm:
+        cm_per_px        = float(plate_diameter_cm) / plate_px_diameter
+        scale_confidence = "high"
+    elif plate_px_diameter:
+        cm_per_px        = 26.0 / plate_px_diameter   # 26cm standart tabak
+        scale_confidence = "medium"
+    elif plate_diameter_cm:
+        cm_per_px        = float(plate_diameter_cm) / img_w
+        scale_confidence = "medium"
+    else:
+        fov_rad          = np.radians(69.0)
+        scene_width_cm   = 2 * camera_height_cm * np.tan(fov_rad / 2)
+        cm_per_px        = scene_width_cm / img_w
+        scale_confidence = "low"
+    return cm_per_px, scale_confidence
+
+
+# ─── 4. ANA PORSIYON TAHMİN FONKSİYONU ──────────────────────────────────────
+def estimate_weight(
+    depth_map:         np.ndarray,
+    pil_image:         Image.Image,
+    food_name:         str,
+    density:           float,
+    camera_height_cm:  float = 30.0,
+    plate_diameter_cm: float = None,
+) -> dict:
+    """
+    Yemek kategorisine göre farklı tahmin stratejisi uygular.
+    Döner: dict  {weight_g, volume_ml, food_pixel_ratio, scale_confidence, method}
     """
     import cv2
 
-    # — Görüntü array'ine çevir —
-    img_arr = np.array(pil_image.convert("RGB"))
-    img_h, img_w = img_arr.shape[:2]
+    img_arr          = np.array(pil_image.convert("RGB"))
+    img_h, img_w     = img_arr.shape[:2]
+    profile          = FOOD_SHAPE_PROFILES.get(food_name)
+    category         = profile[3] if profile else "volumetric"
+    min_g, max_g     = (profile[0], profile[1]) if profile else (80, 600)
+    thickness_cm     = profile[2] if profile else None
 
-    # — Depth map'i görüntü boyutuna resize et (boyutlar farklı gelebilir) —
+    # Depth map boyut eşleştirme
     if depth_map.shape[0] != img_h or depth_map.shape[1] != img_w:
         depth_map = ndimage.zoom(
             depth_map,
@@ -325,57 +525,114 @@ def estimate_weight(
             order=1,
         )
 
-    h, w = depth_map.shape  # artık img_h, img_w ile aynı
-    # — Yemek maskesi (HSV segmentasyon) —
-    img_hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
-    sat, bri = img_hsv[:, :, 1], img_hsv[:, :, 2]
-    mask = (sat > 25) & (bri > 30) & (bri < 240)
-    mask = ndimage.binary_erosion(mask, iterations=2)
-    mask = ndimage.binary_dilation(mask, iterations=4)
+    # Ortak hesaplamalar
+    mask                    = _get_food_mask(img_arr)
+    plate_px_diam, plate_ctr = _detect_plate(img_arr)
 
-    # En büyük / merkeze yakın bileşeni seç
-    labeled, n = ndimage.label(mask)
-    if n == 0:
-        mask = np.ones((h, w), dtype=bool)
-    else:
-        cy, cx      = h // 2, w // 2
-        center_lbl  = labeled[cy, cx]
-        if center_lbl == 0:
-            sizes      = ndimage.sum(mask, labeled, range(1, n + 1))
-            center_lbl = int(np.argmax(sizes)) + 1
-        mask = labeled == center_lbl
+    # Plak varsa maskeyi plak dairesine kısıtla
+    if plate_px_diam and plate_ctr:
+        px_cx, px_cy = plate_ctr
+        r            = plate_px_diam // 2
+        yy, xx       = np.ogrid[:img_h, :img_w]
+        plate_circle = (xx - px_cx) ** 2 + (yy - px_cy) ** 2 <= r ** 2
+        mask         = mask & plate_circle
 
     food_pixel_ratio = float(mask.sum()) / mask.size
+    cm_per_px, scale_confidence = _get_scale(
+        img_w, plate_px_diam, plate_diameter_cm, camera_height_cm
+    )
+    pixel_area_cm2  = cm_per_px ** 2
+    food_area_cm2   = float(mask.sum()) * pixel_area_cm2
 
-    # — Ölçek kalibrasyonu —
-    if plate_diameter_cm:
-        px_per_cm = (w * 0.75) / plate_diameter_cm
-        cm_per_px = 1.0 / px_per_cm
+    # ── Strateji: FLAT ────────────────────────────────────────────────────────
+    if category == "flat":
+        # Depth map kullanılmaz; sadece 2D alan × sabit kalınlık
+        raw_weight = food_area_cm2 * thickness_cm * density
+        weight_g   = int(np.clip(raw_weight, min_g, max_g))
+        volume_ml  = food_area_cm2 * thickness_cm
+        method     = "area_flat"
+
+    # ── Strateji: VOLUMETRIC ──────────────────────────────────────────────────
+    elif category == "volumetric":
+        # Yükseklik sınırı: food-class'a göre veya genel default
+        VOLUMETRIC_MAX_HEIGHT = {
+            "hamburger": 8.0, "hot_dog": 8.0, "doner": 7.0,
+            "iskender": 6.0, "adana-kebap": 6.0,
+            "steak": 5.0, "grilled_salmon": 4.0,
+        }
+        max_h_cm   = VOLUMETRIC_MAX_HEIGHT.get(food_name, 5.0)
+        depth_range_cm = min(camera_height_cm * 0.25, max_h_cm)
+        depth_cm       = depth_map * depth_range_cm
+
+        masked_depth = depth_cm * mask
+        ref_depth    = np.percentile(masked_depth[mask], 5) if mask.sum() > 0 else 0
+        thickness    = np.maximum(masked_depth - ref_depth, 0) * mask
+
+        raw_volume   = float((thickness * pixel_area_cm2).sum())
+        volume_ml    = float(np.clip(raw_volume, 1.0, 2000.0))
+        raw_weight   = volume_ml * density
+
+        # scale_confidence düşükse alanı ağırlıklı yap (daha güvenilir)
+        if scale_confidence == "low":
+            # FOV tahmini kötüyse tahminleri %60'a çek
+            raw_weight = raw_weight * 0.60
+            volume_ml  = volume_ml  * 0.60
+
+        weight_g = int(np.clip(raw_weight, min_g, max_g))
+        method   = "depth_volumetric"
+
+    # ── Strateji: SOUP ────────────────────────────────────────────────────────
+    elif category == "soup":
+        # Çorba/sulu yemek → büyük kase tahmini (300g ± alan oranı)
+        base_g   = 300
+        ratio    = np.clip(food_pixel_ratio / 0.35, 0.7, 1.3)
+        weight_g = int(np.clip(base_g * ratio, min_g, max_g))
+        volume_ml = weight_g / density
+        method    = "fixed_bowl"
+
+    # ── Strateji: DRINK ───────────────────────────────────────────────────────
+    elif category == "drink":
+        base_g   = int((min_g + max_g) / 2)
+        weight_g = base_g
+        volume_ml = weight_g / density
+        method    = "fixed_cup"
+
+    # ── Strateji: FRUIT ───────────────────────────────────────────────────────
+    elif category == "fruit":
+        # Maskenin bounding-box'u → elipsoid hacim tahmini
+        rows      = np.any(mask, axis=1)
+        cols      = np.any(mask, axis=0)
+        if rows.any() and cols.any():
+            r_min, r_max = np.where(rows)[0][[0, -1]]
+            c_min, c_max = np.where(cols)[0][[0, -1]]
+            a_cm  = ((c_max - c_min) / 2) * cm_per_px   # yarı eksen X
+            b_cm  = ((r_max - r_min) / 2) * cm_per_px   # yarı eksen Y
+            c_cm  = (a_cm + b_cm) / 2                    # derinlik tahmini
+            volume_ml = (4 / 3) * np.pi * a_cm * b_cm * c_cm
+        else:
+            volume_ml = 200.0
+        raw_weight = volume_ml * density
+        weight_g   = int(np.clip(raw_weight, min_g, max_g))
+        method     = "ellipsoid_fruit"
+
     else:
-        fov_rad        = np.radians(69.0)
-        scene_width_cm = 2 * camera_height_cm * np.tan(fov_rad / 2)
-        cm_per_px      = scene_width_cm / w
+        weight_g  = int((min_g + max_g) / 2)
+        volume_ml = weight_g / density
+        method    = "fallback_midpoint"
 
-    pixel_area_cm2 = cm_per_px ** 2
-
-    # — Kalınlık (derinlik farkı) —
-    depth_range_cm = camera_height_cm * 0.30
-    depth_cm       = depth_map * depth_range_cm
-    masked_depth   = depth_cm * mask
-    ref_depth      = np.percentile(masked_depth[mask], 5) if mask.sum() > 0 else 0
-    thickness_cm   = np.maximum(masked_depth - ref_depth, 0) * mask
-
-    # — Hacim ve ağırlık —
-    volume_ml = float(np.clip((thickness_cm * pixel_area_cm2).sum(), 1.0, 2000.0))
-    weight_g  = round(volume_ml * density)
-
-    return volume_ml, weight_g, food_pixel_ratio
+    return {
+        "weight_g":         weight_g,
+        "volume_ml":        round(float(volume_ml), 1),
+        "food_pixel_ratio": round(food_pixel_ratio, 3),
+        "scale_confidence": scale_confidence,
+        "method":           method,
+    }
 
 
 # ─── MODEL BAŞLATMA ───────────────────────────────────────────────────────────
 logger.info("Modeller yükleniyor...")
-food_classifier  = FoodClassifier()
-depth_estimator  = DepthEstimator()
+food_classifier = FoodClassifier()
+depth_estimator = DepthEstimator()
 logger.info("🚀 Servis hazır!")
 
 
@@ -383,134 +640,124 @@ logger.info("🚀 Servis hazır!")
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
-        "status":           "ok",
-        "efficientnet":     food_classifier.model is not None,
-        "depth_model":      depth_estimator.mode,
-        "num_classes":      len(food_classifier.idx_to_class),
+        "status":       "ok",
+        "efficientnet": food_classifier.model is not None,
+        "depth_model":  depth_estimator.mode,
+        "num_classes":  len(food_classifier.idx_to_class),
     })
+
+
+def _run_pipeline(pil_img, plate_diam, cam_height, top_k):
+    """Ortak pipeline — hem /analyze hem /analyze-base64 kullanır."""
+    # 1. Yemek tanıma
+    predictions        = food_classifier.predict(pil_img, top_k=top_k)
+    top_food, top_conf = predictions[0]
+
+    # 2. Beslenme DB
+    nutrition                           = NUTRITION_DB.get(top_food, DEFAULT_NUTRITION)
+    cal100, carb100, prot100, fat100, density = nutrition
+
+    # 3. Derinlik (volumetric kategoriler için kullanılır)
+    depth_map = depth_estimator.predict(pil_img)
+
+    # 4. Porsiyon tahmini
+    est = estimate_weight(
+        depth_map, pil_img, top_food, density,
+        camera_height_cm=cam_height,
+        plate_diameter_cm=plate_diam,
+    )
+    weight_g  = est["weight_g"]
+    volume_ml = est["volume_ml"]
+
+    # 5. Besin değerleri
+    factor   = weight_g / 100.0
+    calories = round(cal100  * factor)
+    carbs_g  = round(carb100 * factor, 1)
+    prot_g   = round(prot100 * factor, 1)
+    fat_g    = round(fat100  * factor, 1)
+
+    # 6. Güven seviyesi
+    sc = est["scale_confidence"]
+    if top_conf > 0.75 and sc == "high" and est["food_pixel_ratio"] > 0.20:
+        confidence_level = "high"
+    elif top_conf > 0.50 and sc in ("high", "medium"):
+        confidence_level = "medium"
+    else:
+        confidence_level = "low"
+
+    # 7. Top-5
+    top5 = [{
+        "food_name":          food,
+        "confidence":         round(conf, 4),
+        "calories_estimated": round(NUTRITION_DB.get(food, DEFAULT_NUTRITION)[0] * weight_g / 100),
+    } for food, conf in predictions]
+
+    return {
+        "top_prediction": {
+            "food_name":  top_food,
+            "confidence": round(top_conf, 4),
+            "weight_g":   weight_g,
+            "volume_ml":  volume_ml,
+            "calories":   calories,
+            "carbs_g":    carbs_g,
+            "protein_g":  prot_g,
+            "fat_g":      fat_g,
+        },
+        "top5":             top5,
+        "confidence_level": confidence_level,
+        "estimation_method": est["method"],
+        "scale_confidence": sc,
+        "depth_model":      depth_estimator.mode,
+        "plate_calibrated": plate_diam is not None,
+        "food_fill_ratio":  est["food_pixel_ratio"],
+    }
 
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
     """
-    Ana endpoint — Spring Boot ve React Native buraya gönderir.
+    Multipart/form-data endpoint.
 
-    Request (multipart/form-data):
+    Alanlar:
         image             : yemek fotoğrafı (JPG/PNG)
-        plate_diameter_cm : float, opsiyonel (örn: "26")
+        plate_diameter_cm : float, opsiyonel (örn. "26")
         camera_height_cm  : float, opsiyonel, default 30
         top_k             : int,   opsiyonel, default 5
-
-    Response (JSON):
-        {
-            "top_prediction": {
-                "food_name":    "lahmacun",
-                "confidence":   0.87,
-                "weight_g":     196,
-                "volume_ml":    245.0,
-                "calories":     537,
-                "carbs_g":      62.7,
-                "protein_g":    27.4,
-                "fat_g":        17.6
-            },
-            "top5": [ ... ],
-            "confidence_level": "high",
-            "depth_model":      "depth_anything",
-            "plate_calibrated": true,
-            "processing_ms":    420
-        }
     """
     t_start = time.time()
-
     if "image" not in request.files:
         return jsonify({"error": "image alanı eksik"}), 400
-
     try:
-        # ── Parametreler ──────────────────────────────────────────────────────
         plate_diam = request.form.get("plate_diameter_cm")
         plate_diam = float(plate_diam) if plate_diam else None
         cam_height = float(request.form.get("camera_height_cm", 30.0))
         top_k      = int(request.form.get("top_k", 5))
 
-        # ── Görüntü yükle ─────────────────────────────────────────────────────
         raw = request.files["image"].read()
         try:
             pil_img = Image.open(io.BytesIO(raw)).convert("RGB")
         except UnidentifiedImageError:
-            return jsonify({
-                "error": "Yüklenen dosya geçerli bir resim değil veya desteklenmeyen formatta. JPEG/PNG deneyin."
-            }), 400
+            return jsonify({"error": "Geçersiz resim formatı. JPEG/PNG gönderin."}), 400
 
-        # Performans için boyutu sınırla
         max_dim = 518
         w, h    = pil_img.size
         if max(w, h) > max_dim:
             ratio   = max_dim / max(w, h)
             pil_img = pil_img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
 
-        # ── 1. Yemek tanıma (EfficientNet-B3) ────────────────────────────────
-        predictions = food_classifier.predict(pil_img, top_k=top_k)
-        top_food, top_conf = predictions[0]
+        result = _run_pipeline(pil_img, plate_diam, cam_height, top_k)
+        result["processing_ms"] = int((time.time() - t_start) * 1000)
 
-        # ── 2. Derinlik → hacim → gram ────────────────────────────────────────
-        depth_map              = depth_estimator.predict(pil_img)
-        nutrition              = NUTRITION_DB.get(top_food, DEFAULT_NUTRITION)
-        cal100, carb100, prot100, fat100, density = nutrition
-
-        volume_ml, weight_g, fill_ratio = estimate_weight(
-            depth_map, pil_img, density, cam_height, plate_diam
-        )
-
-        # ── 3. Besin değerleri (Denklem 3.2) ──────────────────────────────────
-        factor   = weight_g / 100.0
-        calories = round(cal100  * factor)
-        carbs_g  = round(carb100 * factor, 1)
-        prot_g   = round(prot100 * factor, 1)
-        fat_g    = round(fat100  * factor, 1)
-
-        # ── 4. Güven seviyesi ─────────────────────────────────────────────────
-        if top_conf > 0.75 and plate_diam and fill_ratio > 0.3:
-            confidence_level = "high"
-        elif top_conf > 0.50 and fill_ratio > 0.2:
-            confidence_level = "medium"
-        else:
-            confidence_level = "low"
-
-        # ── 5. Top-5 listesi ──────────────────────────────────────────────────
-        top5 = []
-        for food, conf in predictions:
-            n       = NUTRITION_DB.get(food, DEFAULT_NUTRITION)
-            cal_est = round(n[0] * weight_g / 100)
-            top5.append({
-                "food_name":  food,
-                "confidence": round(conf, 4),
-                "calories_estimated": cal_est,
-            })
-
-        processing_ms = int((time.time() - t_start) * 1000)
         logger.info(
-            f"{top_food} | conf={top_conf:.2f} | "
-            f"{weight_g}g | {calories}kcal | {processing_ms}ms"
+            f"{result['top_prediction']['food_name']} | "
+            f"conf={result['top_prediction']['confidence']:.2f} | "
+            f"{result['top_prediction']['weight_g']}g | "
+            f"{result['top_prediction']['calories']}kcal | "
+            f"method={result['estimation_method']} | "
+            f"scale={result['scale_confidence']} | "
+            f"{result['processing_ms']}ms"
         )
-
-        return jsonify({
-            "top_prediction": {
-                "food_name":  top_food,
-                "confidence": round(top_conf, 4),
-                "weight_g":   weight_g,
-                "volume_ml":  round(volume_ml, 1),
-                "calories":   calories,
-                "carbs_g":    carbs_g,
-                "protein_g":  prot_g,
-                "fat_g":      fat_g,
-            },
-            "top5":             top5,
-            "confidence_level": confidence_level,
-            "depth_model":      depth_estimator.mode,
-            "plate_calibrated": plate_diam is not None,
-            "food_fill_ratio":  round(fill_ratio, 3),
-            "processing_ms":    processing_ms,
-        })
+        return jsonify(result)
 
     except Exception as e:
         logger.error(f"Hata: {e}", exc_info=True)
@@ -520,77 +767,37 @@ def analyze():
 @app.route("/analyze-base64", methods=["POST"])
 def analyze_base64():
     """
-    Base64 görsel için alternatif endpoint.
-    React Native'den base64 göndermek daha kolay olduğunda kullanılır.
+    JSON endpoint (base64 görsel).
 
-    Request (JSON):
+    Body:
         {
-            "image_base64":     "...",
-            "plate_diameter_cm": 26,   (opsiyonel)
-            "camera_height_cm":  30    (opsiyonel)
+            "image_base64":      "...",
+            "plate_diameter_cm":  26,   (opsiyonel)
+            "camera_height_cm":   30,   (opsiyonel)
+            "top_k":               5    (opsiyonel)
         }
     """
     import base64
-
-    data = request.get_json()
+    t_start = time.time()
+    data    = request.get_json()
     if not data or "image_base64" not in data:
         return jsonify({"error": "image_base64 alanı eksik"}), 400
-
-    # Base64'ü files gibi işle ve ana endpoint'i çağır
-    img_bytes = base64.b64decode(data["image_base64"])
-
-    # request.files mock yerine doğrudan işle
-    pil_img   = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    max_dim   = 518
-    w, h      = pil_img.size
-    if max(w, h) > max_dim:
-        ratio   = max_dim / max(w, h)
-        pil_img = pil_img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
-
-    plate_diam  = data.get("plate_diameter_cm")
-    cam_height  = float(data.get("camera_height_cm", 30.0))
-    top_k       = int(data.get("top_k", 5))
-
     try:
-        predictions = food_classifier.predict(pil_img, top_k=top_k)
-        top_food, top_conf = predictions[0]
+        img_bytes  = base64.b64decode(data["image_base64"])
+        pil_img    = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        max_dim    = 518
+        w, h       = pil_img.size
+        if max(w, h) > max_dim:
+            ratio   = max_dim / max(w, h)
+            pil_img = pil_img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
 
-        depth_map              = depth_estimator.predict(pil_img)
-        nutrition              = NUTRITION_DB.get(top_food, DEFAULT_NUTRITION)
-        cal100, carb100, prot100, fat100, density = nutrition
-        volume_ml, weight_g, fill_ratio = estimate_weight(
-            depth_map, pil_img, density, cam_height, plate_diam
-        )
+        plate_diam = data.get("plate_diameter_cm")
+        cam_height = float(data.get("camera_height_cm", 30.0))
+        top_k      = int(data.get("top_k", 5))
 
-        factor   = weight_g / 100.0
-        calories = round(cal100  * factor)
-        carbs_g  = round(carb100 * factor, 1)
-        prot_g   = round(prot100 * factor, 1)
-        fat_g    = round(fat100  * factor, 1)
-
-        if top_conf > 0.75 and plate_diam and fill_ratio > 0.3:
-            confidence_level = "high"
-        elif top_conf > 0.50 and fill_ratio > 0.2:
-            confidence_level = "medium"
-        else:
-            confidence_level = "low"
-
-        top5 = [{"food_name": f, "confidence": round(c, 4),
-                  "calories_estimated": round(NUTRITION_DB.get(f, DEFAULT_NUTRITION)[0] * weight_g / 100)}
-                for f, c in predictions]
-
-        return jsonify({
-            "top_prediction": {
-                "food_name":  top_food, "confidence": round(top_conf, 4),
-                "weight_g":   weight_g, "volume_ml":  round(volume_ml, 1),
-                "calories":   calories, "carbs_g":    carbs_g,
-                "protein_g":  prot_g,   "fat_g":      fat_g,
-            },
-            "top5":             top5,
-            "confidence_level": confidence_level,
-            "depth_model":      depth_estimator.mode,
-            "plate_calibrated": plate_diam is not None,
-        })
+        result = _run_pipeline(pil_img, plate_diam, cam_height, top_k)
+        result["processing_ms"] = int((time.time() - t_start) * 1000)
+        return jsonify(result)
 
     except Exception as e:
         logger.error(f"Base64 hatası: {e}", exc_info=True)
@@ -598,16 +805,15 @@ def analyze_base64():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    logger.info("=" * 55)
-    logger.info("  Snackabetic AI Servisi")
-    logger.info(f"  Model:        {MODEL_PATH}")
-    logger.info(f"  Depth:        {depth_estimator.mode}")
-    logger.info(f"  Sınıf sayısı: {len(food_classifier.idx_to_class)}")
+    port = int(os.environ.get("PORT", 5001))
+    logger.info("=" * 60)
+    logger.info("  Snackabetic AI Servisi  v2")
+    logger.info(f"  Model:         {MODEL_PATH}")
+    logger.info(f"  Depth:         {depth_estimator.mode}")
+    logger.info(f"  Sınıf sayısı:  {len(food_classifier.idx_to_class)}")
     logger.info("  Endpointler:")
     logger.info("    GET  /health")
     logger.info("    POST /analyze          (multipart)")
-    logger.info("    POST /analyze-base64   (JSON)")
-    logger.info("=" * 55)
-    logger.info("  Port:         %s", port)
+    logger.info("    POST /analyze-base64   (JSON + base64)")
+    logger.info("=" * 60)
     app.run(host="0.0.0.0", port=port, debug=False)

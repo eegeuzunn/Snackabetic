@@ -3,6 +3,7 @@
 ## AI Service (Kısa Kurulum)
 
 Bu servis yemek görselinden tahmini gram ve besin değerlerini döner.
+V2 sürümünde porsiyon tahmini kategoriye gore (flat/volumetric/soup/drink/fruit) hesaplanir.
 
 ### 1) Ai klasörüne gir
 
