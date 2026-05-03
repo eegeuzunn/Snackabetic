@@ -78,3 +78,87 @@ Notlar:
 - Backend container içinde DB servisi adı ile erişilir: `jdbc:postgresql://db:5432/snackabetic`
 - Host AI portunu değiştirmek istersen: `AI_PORT=5010 docker compose up --build`
 - Durdurmak için: `docker compose down`
+
+## Mobile App Başlatma
+
+### 1) Mobile klasörüne gir
+
+```bash
+cd Mobile
+```
+
+### 2) Bağımlılıkları yükle
+
+```bash
+npm install
+```
+
+### 3) Uygulamayı başlat
+
+**Expo ile:**
+
+```bash
+npm start
+```
+
+Ardından terminalde gösterilen seçeneklerden birini seç:
+
+- `i` - iOS simülatörü ile aç
+- `a` - Android emülatörü ile aç
+- `w` - Web tarayıcısı ile aç
+- `j` - Expo Go uygulaması ile cihazdan QR kod tarayarak aç
+
+### 4) Backend yapılandırması
+
+#### Simulator/Emülatör için (varsayılan)
+
+Backend localhost'ta çalışıyorsa sorun yoktur.
+
+#### Fiziksel cihazda çalıştırma için
+
+**Önemli:** Fiziksel cihaz localhost erişemez. Backend sunucunuzun IP adresini kullanmalısınız.
+
+**Adım 1:** Bilgisayarınızın ağdaki IP adresini bulun
+
+macOS/Linux:
+
+```bash
+ifconfig | grep "inet " | grep -v 127.0.0.1
+```
+
+Windows:
+
+```bash
+ipconfig
+```
+
+Genellikle `192.168.x.x` veya `10.0.x.x` formatında olur.
+
+**Adım 2:** `Mobile/src/constants/config.js` dosyasını düzenle
+
+```javascript
+export const API_BASE_URL = "http://YOUR_IP:8080";
+export const AI_SERVICE_URL = "http://YOUR_IP:5001";
+```
+
+Örnek:
+
+```javascript
+export const API_BASE_URL = "http://192.168.1.42:8080";
+export const AI_SERVICE_URL = "http://192.168.1.42:5001";
+```
+
+**Adım 3:** Backend ve AI servisinin fiziksel cihazdan erişilebilir olduğundan emin ol
+
+```bash
+# Cihazın terminal'inde test et
+ping 192.168.1.42
+```
+
+**Adım 4:** Uygulamayı yeniden başlat
+
+```bash
+npm start
+```
+
+**Not:** IP adresleri değişirse (ağı değiştirdin, bilgisayar yeniden başladı), `config.js`'i güncelle ve uygulamayı yeniden başlat.
