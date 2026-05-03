@@ -69,12 +69,34 @@ export default function CameraScreen({ navigation, route }) {
   }
 
   async function pickFromGallery() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      setPhotoUri(result.assets[0].uri);
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("İzin gerekli", "Galeriye erişim izni gerekli.");
+        return;
+      }
+
+      const mediaTypesOption =
+        (ImagePicker.MediaType && ImagePicker.MediaType.Images) ||
+        (ImagePicker.MediaTypeOptions && ImagePicker.MediaTypeOptions.Images) ||
+        ImagePicker.MediaTypeOptions?.Images ||
+        ImagePicker.MediaType?.Images ||
+        ImagePicker.MediaTypeOptions?.All;
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: mediaTypesOption,
+        quality: 0.8,
+      });
+
+      if (!result) return;
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPhotoUri(result.assets[0].uri);
+      } else if (result.uri) {
+        // older API
+        setPhotoUri(result.uri);
+      }
+    } catch (err) {
+      Alert.alert("Galeri Hatası", err.message || "Galeri açılamadı.");
     }
   }
 

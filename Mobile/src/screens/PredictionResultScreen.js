@@ -10,6 +10,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  PanResponder,
 } from "react-native";
 import { searchFoods } from "../services/foodService";
 import { createMeal } from "../services/mealService";
@@ -24,6 +25,20 @@ function useDebounce(value, delay = 400) {
     return () => clearTimeout(id);
   }, [value, delay]);
   return debounced;
+}
+
+/**
+ * Normalize food names for flexible matching.
+ * "Adana Kebap", "adana-kebap", "adana kebap" → "adana kebap"
+ */
+function normalizeFoodName(name) {
+  if (!name) return "";
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[-_]+/g, " ") // Convert hyphens/underscores to spaces
+    .replace(/\s+/g, " ") // Normalize multiple spaces to single space
+    .trim();
 }
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
@@ -77,12 +92,134 @@ export default function PredictionResultScreen({ route, navigation }) {
     };
   }, [debouncedQuery]);
 
+  // Auto-select a normalized match so the predicted food can be confirmed directly.
+  // Handles variations like "adana-kebap" vs "Adana Kebap" vs "adana kebap".
+  useEffect(() => {
+    if (mode !== "edit" || !searchResults.length || !searchQuery) {
+      return;
+    }
+
+    const normalizedQuery = normalizeFoodName(searchQuery);
+    if (!normalizedQuery) {
+      return;
+    }
+
+    // First, try exact normalized match
+    let match = searchResults.find(
+      (item) => normalizeFoodName(item.name) === normalizedQuery,
+    );
+
+    // If no exact match, try partial match (query is substring of result)
+    if (!match) {
+      match = searchResults.find((item) =>
+        normalizeFoodName(item.name).includes(normalizedQuery),
+      );
+    }
+
+    if (match && selectedFood?.id !== match.id) {
+      setSelectedFood(match);
+      // show the nicely-cased name in the input so it appears selected
+      setSearchQuery(match.name);
+    }
+  }, [mode, searchResults, searchQuery, selectedFood?.id]);
+
   // ── Enter edit mode ──────────────────────────────────────────────────
-  function enterEditMode() {
+  async function enterEditMode() {
     setMode("edit");
-    // Trigger initial search with AI food name
+
+    // Try to auto-select the predicted food immediately by searching
+    if (prediction?.foodName) {
+      try {
+        // Normalize the query before searching (adana-kebap → adana kebap)
+        const normalizedQuery = normalizeFoodName(prediction.foodName);
+        const results = await searchFoods(normalizedQuery);
+        const normalizedPredicted = normalizedQuery;
+
+        // First, try exact normalized match
+        let match = results.find((item) => {
+          const normalized = normalizeFoodName(item.name);
+          return normalized === normalizedPredicted;
+        });
+
+        // If no exact match, try partial match
+        if (!match) {
+          match = results.find((item) => {
+            const normalized = normalizeFoodName(item.name);
+            return normalized.includes(normalizedPredicted);
+          });
+        }
+
+        if (match) {
+          setSelectedFood(match);
+          setSearchQuery(match.name);
+        } else {
+          // Fallback: just set the query, let the useEffect debounce/match handle it
+          setSearchQuery(prediction.foodName);
+        }
+      } catch (error) {
+        // On error, just set the query
+        setSearchQuery(prediction.foodName);
+      }
+    }
+
     setTimeout(() => searchInputRef.current?.focus(), 100);
   }
+
+  // ── Gram helpers (compact stepper + numeric input) ─────────────────
+  function sanitizeNumberInput(text) {
+    // allow digits and single decimal point
+    const cleaned = text.replace(/[^0-9.]/g, "");
+    const parts = cleaned.split(".");
+    if (parts.length > 2) return parts[0] + "." + parts.slice(1).join("");
+    return cleaned;
+  }
+
+  function incrementGram(step = 10) {
+    const cur = parseFloat(gram) || 0;
+    const next = Math.min(5000, Math.round((cur + step) * 10) / 10);
+    setGram(String(next));
+  }
+
+  function decrementGram(step = 10) {
+    const cur = parseFloat(gram) || 0;
+    const next = Math.max(0, Math.round((cur - step) * 10) / 10);
+    setGram(next > 0 ? String(next) : "");
+  }
+
+  // ── Drag-to-adjust (slider with knob)
+  const dragStartGramRef = useRef(0);
+  const sliderWidthRef = useRef(240);
+  const [sliderWidth, setSliderWidth] = useState(240);
+  React.useEffect(() => {
+    sliderWidthRef.current = sliderWidth;
+  }, [sliderWidth]);
+
+  const MAX_SLIDER_GRAM = 2000;
+  const KNOB_SIZE = 22;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        dragStartGramRef.current = parseFloat(gram) || 0;
+      },
+      onPanResponderMove: (_, gesture) => {
+        const dx = gesture.dx || 0;
+        const width = sliderWidthRef.current || 240;
+        const deltaGram = (dx / Math.max(1, width)) * MAX_SLIDER_GRAM;
+        const next = Math.max(
+          0,
+          Math.min(
+            MAX_SLIDER_GRAM,
+            Math.round((dragStartGramRef.current + deltaGram) * 10) / 10,
+          ),
+        );
+        setGram(next > 0 ? String(next) : "");
+      },
+      onPanResponderRelease: () => {},
+    }),
+  ).current;
 
   function handleCancel() {
     if (navigation.canGoBack()) {
@@ -96,7 +233,7 @@ export default function PredictionResultScreen({ route, navigation }) {
 
   // ── Select a food from search results ───────────────────────────────
   const selectFood = useCallback((food) => {
-    setSelectedFood({ id: food.id, name: food.name });
+    setSelectedFood(food);
     setSearchQuery(food.name);
     setSearchResults([]); // hide list
   }, []);
@@ -294,18 +431,45 @@ export default function PredictionResultScreen({ route, navigation }) {
         />
       )}
 
-      {/* Gram input */}
+      {/* Gram input (compact) */}
       <Text style={[styles.fieldLabel, { marginTop: theme.spacing.lg }]}>
         Gram
       </Text>
-      <TextInput
-        style={styles.input}
-        value={gram}
-        onChangeText={setGram}
-        keyboardType="decimal-pad"
-        placeholder="Örn: 250"
-        placeholderTextColor={theme.colors.textSecondary}
-      />
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: theme.spacing.md,
+        }}
+      >
+        <View
+          style={styles.sliderContainer}
+          onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
+          {...panResponder.panHandlers}
+        >
+          <View style={styles.sliderBar} />
+          {(() => {
+            const val = parseFloat(gram) || 0;
+            const ratio = Math.max(0, Math.min(1, val / MAX_SLIDER_GRAM));
+            const left = ratio * (sliderWidth - KNOB_SIZE);
+            return (
+              <View style={[styles.sliderKnob, { left }]}>
+                <View style={styles.knobInner} />
+              </View>
+            );
+          })()}
+        </View>
+
+        <TextInput
+          style={styles.gramInput}
+          value={gram}
+          onChangeText={(t) => setGram(sanitizeNumberInput(t))}
+          keyboardType="decimal-pad"
+          placeholder="250"
+          placeholderTextColor={theme.colors.textSecondary}
+          maxLength={6}
+        />
+      </View>
 
       {selectedFood && (
         <Text style={styles.selectedNote}>✓ Seçili: {selectedFood.name}</Text>
@@ -458,6 +622,48 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textPrimary,
     backgroundColor: theme.colors.surface,
+  },
+  gramInput: {
+    width: 120,
+    height: 48,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 10,
+    textAlign: "center",
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    backgroundColor: theme.colors.surface,
+  },
+  /* compact slider + input only; removed step buttons */
+  sliderContainer: {
+    flex: 1,
+    height: 40,
+    justifyContent: "center",
+    position: "relative",
+    paddingHorizontal: theme.spacing.sm,
+  },
+  sliderBar: {
+    position: "absolute",
+    left: theme.spacing.sm,
+    right: theme.spacing.sm,
+    height: 3,
+    backgroundColor: theme.colors.border,
+    borderRadius: 2,
+  },
+  sliderKnob: {
+    position: "absolute",
+    top: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  knobInner: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
   },
   resultsList: {
     maxHeight: 200,
