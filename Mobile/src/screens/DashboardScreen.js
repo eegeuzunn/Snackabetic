@@ -53,7 +53,10 @@ export default function DashboardScreen({ navigation }) {
       setRecentMeals(recentMeals);
       if (stats) setDailyStats(stats);
       if (profile?.targetGlucoseMin && profile?.targetGlucoseMax) {
-        setGlucoseTarget({ min: profile.targetGlucoseMin, max: profile.targetGlucoseMax });
+        setGlucoseTarget({
+          min: profile.targetGlucoseMin,
+          max: profile.targetGlucoseMax,
+        });
       }
     } catch (e) {
       setError(e.message || "Veriler yüklenemedi.");
@@ -63,7 +66,9 @@ export default function DashboardScreen({ navigation }) {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
     const unsub = navigation.addListener("focus", () => load(true));
@@ -85,11 +90,17 @@ export default function DashboardScreen({ navigation }) {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.scroll, { paddingTop: insets.top + theme.spacing.lg }]}
+      contentContainerStyle={[
+        styles.scroll,
+        { paddingTop: insets.top + theme.spacing.lg },
+      ]}
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
-          onRefresh={() => { setIsRefreshing(true); load(true); }}
+          onRefresh={() => {
+            setIsRefreshing(true);
+            load(true);
+          }}
           tintColor={theme.colors.primary}
         />
       }
@@ -128,12 +139,25 @@ export default function DashboardScreen({ navigation }) {
         {/* Satır 2: Kan şekeri + İnsülin */}
         <View style={styles.summaryRow}>
           <View style={styles.summaryTile}>
-            <Text style={[styles.tileValue, { color: avgGlucose != null ? glucoseStatus.color : theme.colors.textPrimary }]}>
+            <Text
+              style={[
+                styles.tileValue,
+                {
+                  color:
+                    avgGlucose != null
+                      ? glucoseStatus.color
+                      : theme.colors.textPrimary,
+                },
+              ]}
+            >
               {avgGlucose != null ? avgGlucose : "—"}
-              {avgGlucose != null && <Text style={styles.tileUnit}> mg/dL</Text>}
+              {avgGlucose != null && (
+                <Text style={styles.tileUnit}> mg/dL</Text>
+              )}
             </Text>
             <Text style={styles.tileLabel}>
-              Kan Şekeri Ort.{avgGlucose != null ? ` · ${glucoseStatus.label}` : ""}
+              Kan Şekeri Ort.
+              {avgGlucose != null ? ` · ${glucoseStatus.label}` : ""}
             </Text>
           </View>
 
@@ -142,7 +166,9 @@ export default function DashboardScreen({ navigation }) {
           <View style={styles.summaryTile}>
             <Text style={styles.tileValue}>
               {summary.totalInsulinUnits > 0 ? summary.totalInsulinUnits : "—"}
-              {summary.totalInsulinUnits > 0 && <Text style={styles.tileUnit}> ü</Text>}
+              {summary.totalInsulinUnits > 0 && (
+                <Text style={styles.tileUnit}> ü</Text>
+              )}
             </Text>
             <Text style={styles.tileLabel}>İnsülin</Text>
           </View>
@@ -169,12 +195,16 @@ export default function DashboardScreen({ navigation }) {
         <QuickButton
           label="Glukoz Ekle"
           color="#EF4444"
-          onPress={() => navigation.navigate(APP_ROUTES.DIABETES_LOG, { type: "glucose" })}
+          onPress={() =>
+            navigation.navigate(APP_ROUTES.DIABETES_LOG, { type: "glucose" })
+          }
         />
         <QuickButton
           label="İnsülin Ekle"
           color="#8B5CF6"
-          onPress={() => navigation.navigate(APP_ROUTES.DIABETES_LOG, { type: "insulin" })}
+          onPress={() =>
+            navigation.navigate(APP_ROUTES.DIABETES_LOG, { type: "insulin" })
+          }
         />
       </View>
 
@@ -201,26 +231,44 @@ export default function DashboardScreen({ navigation }) {
           <Text style={styles.cardTitle}>Son Yenilenler</Text>
           {recentMeals.map((meal, index) => (
             <View key={meal.id}>
-              <View style={styles.recentMealRow}>
+              <TouchableOpacity
+                style={styles.recentMealRow}
+                activeOpacity={0.85}
+                disabled={!meal.id}
+                onPress={() =>
+                  navigation.navigate(APP_ROUTES.MEAL_DETAIL, {
+                    mealId: meal.id,
+                  })
+                }
+              >
                 <View style={styles.recentMealInfo}>
-                  <Text style={styles.recentMealType}>{formatMealType(meal.mealType)}</Text>
-                  <Text style={styles.recentMealTime}>{formatRelativeTime(meal.mealTime)}</Text>
+                  <Text style={styles.recentMealType}>
+                    {formatMealType(meal.mealType)}
+                  </Text>
+                  <Text style={styles.recentMealTime}>
+                    {formatRelativeTime(meal.mealTime)}
+                  </Text>
                 </View>
                 <View style={styles.recentMealValues}>
                   {meal.totalCarbsG != null && (
-                    <Text style={styles.recentMealCarbs}>{parseFloat(meal.totalCarbsG).toFixed(0)} g karb</Text>
+                    <Text style={styles.recentMealCarbs}>
+                      {parseFloat(meal.totalCarbsG).toFixed(0)} g karb
+                    </Text>
                   )}
                   {meal.totalCalories != null && (
-                    <Text style={styles.recentMealCal}>{Math.round(meal.totalCalories)} kcal</Text>
+                    <Text style={styles.recentMealCal}>
+                      {Math.round(meal.totalCalories)} kcal
+                    </Text>
                   )}
                 </View>
-              </View>
-              {index < recentMeals.length - 1 && <View style={styles.divider} />}
+              </TouchableOpacity>
+              {index < recentMeals.length - 1 && (
+                <View style={styles.divider} />
+              )}
             </View>
           ))}
         </View>
       )}
-
     </ScrollView>
   );
 }
@@ -238,7 +286,12 @@ function QuickButton({ label, color, onPress }) {
 }
 
 function formatMealType(type) {
-  const map = { BREAKFAST: "Kahvaltı", LUNCH: "Öğle", DINNER: "Akşam", SNACK: "Atıştırmalık" };
+  const map = {
+    BREAKFAST: "Kahvaltı",
+    LUNCH: "Öğle",
+    DINNER: "Akşam",
+    SNACK: "Atıştırmalık",
+  };
   return map[type] ?? type;
 }
 
@@ -254,20 +307,40 @@ function formatRelativeTime(isoString) {
 }
 
 function formatDate(date) {
-  return date.toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" });
+  return date.toLocaleDateString("tr-TR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
 
 function getGlucoseStatus(val, target) {
-  if (val == null) return { label: "—", color: theme.colors.textSecondary, bg: theme.colors.border };
-  if (val < target.min) return { label: "Düşük", color: "#EF4444", bg: "#FEE2E2" };
-  if (val > target.max) return { label: "Yüksek", color: "#F97316", bg: "#FEF3C7" };
+  if (val == null)
+    return {
+      label: "—",
+      color: theme.colors.textSecondary,
+      bg: theme.colors.border,
+    };
+  if (val < target.min)
+    return { label: "Düşük", color: "#EF4444", bg: "#FEE2E2" };
+  if (val > target.max)
+    return { label: "Yüksek", color: "#F97316", bg: "#FEF3C7" };
   return { label: "Normal", color: "#22C55E", bg: "#D1FAE5" };
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  scroll: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl, paddingTop: theme.spacing.lg },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: theme.colors.background },
+  scroll: {
+    padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.xxl,
+    paddingTop: theme.spacing.lg,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: theme.colors.background,
+  },
 
   greeting: {
     fontFamily: "Outfit_700Bold",
@@ -276,7 +349,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: theme.spacing.lg,
   },
-  errorText: { ...theme.typography.caption, color: theme.colors.danger, marginBottom: theme.spacing.md },
+  errorText: {
+    ...theme.typography.caption,
+    color: theme.colors.danger,
+    marginBottom: theme.spacing.md,
+  },
 
   card: {
     backgroundColor: theme.colors.surface,
@@ -300,31 +377,101 @@ const styles = StyleSheet.create({
   },
 
   summaryRow: { flexDirection: "row", alignItems: "center" },
-  summaryTile: { flex: 1, alignItems: "center", paddingVertical: theme.spacing.sm },
+  summaryTile: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: theme.spacing.sm,
+  },
   tileDivider: { width: 1, height: 48, backgroundColor: theme.colors.border },
-  tileValue: { fontSize: 22, fontFamily: "Outfit_700Bold", color: theme.colors.textPrimary },
-  tileUnit: { fontSize: 13, fontFamily: "Outfit_400Regular", color: theme.colors.textSecondary },
-  tileLabel: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 2, textAlign: "center" },
+  tileValue: {
+    fontSize: 22,
+    fontFamily: "Outfit_700Bold",
+    color: theme.colors.textPrimary,
+  },
+  tileUnit: {
+    fontSize: 13,
+    fontFamily: "Outfit_400Regular",
+    color: theme.colors.textSecondary,
+  },
+  tileLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+    textAlign: "center",
+  },
 
-  rowDivider: { height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.md },
+  rowDivider: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginVertical: theme.spacing.md,
+  },
 
-  recentMealRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: theme.spacing.sm },
+  recentMealRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: theme.spacing.sm,
+  },
   recentMealInfo: { flex: 1 },
-  recentMealType: { ...theme.typography.caption, fontFamily: "Outfit_700Bold", color: theme.colors.textPrimary },
-  recentMealTime: { ...theme.typography.caption, color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
+  recentMealType: {
+    ...theme.typography.caption,
+    fontFamily: "Outfit_700Bold",
+    color: theme.colors.textPrimary,
+  },
+  recentMealTime: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
   recentMealValues: { alignItems: "flex-end" },
-  recentMealCarbs: { ...theme.typography.caption, fontFamily: "Outfit_700Bold", color: theme.colors.primary },
-  recentMealCal: { ...theme.typography.caption, color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
+  recentMealCarbs: {
+    ...theme.typography.caption,
+    fontFamily: "Outfit_700Bold",
+    color: theme.colors.primary,
+  },
+  recentMealCal: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
 
-  mealCountText: { ...theme.typography.caption, color: theme.colors.textSecondary, textAlign: "center" },
+  mealCountText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+  },
 
-  badge: { borderRadius: 20, paddingHorizontal: theme.spacing.sm, paddingVertical: 2 },
-  badgeText: { fontSize: 12, fontFamily: "Outfit_700Bold", color: theme.colors.textPrimary },
+  badge: {
+    borderRadius: 20,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontFamily: "Outfit_700Bold",
+    color: theme.colors.textPrimary,
+  },
 
-  emptyText: { ...theme.typography.body, color: theme.colors.textSecondary, textAlign: "center", paddingVertical: theme.spacing.lg },
+  emptyText: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    paddingVertical: theme.spacing.lg,
+  },
 
-  sectionTitle: { ...theme.typography.body, fontFamily: "Outfit_700Bold", color: theme.colors.textPrimary, marginBottom: theme.spacing.md },
-  quickRow: { flexDirection: "row", gap: theme.spacing.sm, marginBottom: theme.spacing.md },
+  sectionTitle: {
+    ...theme.typography.body,
+    fontFamily: "Outfit_700Bold",
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.md,
+  },
+  quickRow: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
   quickBtn: {
     flex: 1,
     borderRadius: 14,
@@ -333,5 +480,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 52,
   },
-  quickBtnLabel: { fontSize: 12, lineHeight: 16, fontFamily: "Outfit_700Bold", color: "#fff", textAlign: "center" },
+  quickBtnLabel: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: "Outfit_700Bold",
+    color: "#fff",
+    textAlign: "center",
+  },
 });

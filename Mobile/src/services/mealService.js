@@ -17,3 +17,8 @@ export async function createMeal({ items, mealType = "SNACK", notes = "" }) {
     items: items.map(({ foodId, amountGrams }) => ({ foodId, amountGrams })),
   });
 }
+
+export async function getMealById(id) {
+  if (!id) return null;
+  return api.get(`/meals/${id}`);
+}

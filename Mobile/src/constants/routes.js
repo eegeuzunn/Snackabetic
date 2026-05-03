@@ -9,6 +9,8 @@ export const APP_ROUTES = {
   HISTORY: "History",
   SETTINGS: "Settings",
   PREDICTION_RESULT: "PredictionResult",
+  MEAL_DETAIL: "MealDetail",
+  HISTORY_DETAIL: "HistoryDetail",
   DIABETES_LOG: "DiabetesLog",
 };
 

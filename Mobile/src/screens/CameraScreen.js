@@ -76,12 +76,9 @@ export default function CameraScreen({ navigation, route }) {
         return;
       }
 
-      const mediaTypesOption =
-        (ImagePicker.MediaType && ImagePicker.MediaType.Images) ||
-        (ImagePicker.MediaTypeOptions && ImagePicker.MediaTypeOptions.Images) ||
-        ImagePicker.MediaTypeOptions?.Images ||
-        ImagePicker.MediaType?.Images ||
-        ImagePicker.MediaTypeOptions?.All;
+      const mediaTypesOption = ImagePicker.MediaType?.Images
+        ? [ImagePicker.MediaType.Images]
+        : ["images"];
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: mediaTypesOption,

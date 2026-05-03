@@ -13,3 +13,8 @@ export async function getFoods(page = 0, size = 30) {
   });
   return data?.content ?? [];
 }
+
+export async function getFoodById(id) {
+  if (!id) return null;
+  return api.get(`/foods/${id}`);
+}

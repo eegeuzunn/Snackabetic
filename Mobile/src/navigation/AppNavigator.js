@@ -13,10 +13,11 @@ import HistoryScreen from "../screens/HistoryScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import PredictionResultScreen from "../screens/PredictionResultScreen";
+import MealDetailScreen from "../screens/MealDetailScreen";
+import HistoryDetailScreen from "../screens/HistoryDetailScreen";
 import DiabetesLogScreen from "../screens/DiabetesLogScreen";
 import theme from "../theme";
 import { APP_ROUTES, AUTH_ROUTES, STACK_ROUTES } from "../constants/routes";
-
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -35,9 +36,9 @@ const navigationTheme = {
 
 const TAB_ICONS = {
   [APP_ROUTES.DASHBOARD]: "home",
-  [APP_ROUTES.ADD_MEAL]:  "plus-circle",
-  [APP_ROUTES.HISTORY]:   "clock",
-  [APP_ROUTES.SETTINGS]:  "user",
+  [APP_ROUTES.ADD_MEAL]: "plus-circle",
+  [APP_ROUTES.HISTORY]: "clock",
+  [APP_ROUTES.SETTINGS]: "user",
 };
 
 function AppTabs({ onSignOut }) {
@@ -85,17 +86,21 @@ function AppTabs({ onSignOut }) {
         component={HistoryScreen}
         options={{ title: "Geçmiş" }}
       />
-      <Tab.Screen
-        name={APP_ROUTES.SETTINGS}
-        options={{ title: "Profil" }}
-      >
+      <Tab.Screen name={APP_ROUTES.SETTINGS} options={{ title: "Profil" }}>
         {() => <SettingsScreen onSignOut={onSignOut} />}
       </Tab.Screen>
     </Tab.Navigator>
   );
 }
 
-export default function AppNavigator({ isAuthenticated, needsOnboarding, onLogin, onSignup, onSignOut, onOnboardingComplete }) {
+export default function AppNavigator({
+  isAuthenticated,
+  needsOnboarding,
+  onLogin,
+  onSignup,
+  onSignOut,
+  onOnboardingComplete,
+}) {
   return (
     <NavigationContainer theme={navigationTheme}>
       <StatusBar style="dark" />
@@ -116,14 +121,26 @@ export default function AppNavigator({ isAuthenticated, needsOnboarding, onLogin
               options={{ headerShown: true, title: "Tahmin Sonucu" }}
             />
             <Stack.Screen
+              name={APP_ROUTES.MEAL_DETAIL}
+              component={MealDetailScreen}
+              options={{ headerShown: true, title: "Öğün Detayı" }}
+            />
+            <Stack.Screen
+              name={APP_ROUTES.HISTORY_DETAIL}
+              component={HistoryDetailScreen}
+              options={{ headerShown: true, title: "Kayıt Detayı" }}
+            />
+            <Stack.Screen
               name={APP_ROUTES.DIABETES_LOG}
               component={DiabetesLogScreen}
               options={({ route }) => ({
                 headerShown: true,
                 title:
-                  route.params?.type === "glucose" ? "Glukoz Ölçümü" :
-                  route.params?.type === "insulin" ? "İnsülin Dozu" :
-                  "Günlük Ekle",
+                  route.params?.type === "glucose"
+                    ? "Glukoz Ölçümü"
+                    : route.params?.type === "insulin"
+                      ? "İnsülin Dozu"
+                      : "Günlük Ekle",
               })}
             />
             <Stack.Screen
@@ -143,7 +160,9 @@ export default function AppNavigator({ isAuthenticated, needsOnboarding, onLogin
               {({ navigation }) => (
                 <LoginScreen
                   onLogin={onLogin}
-                  onNavigateSignup={() => navigation.navigate(AUTH_ROUTES.SIGNUP)}
+                  onNavigateSignup={() =>
+                    navigation.navigate(AUTH_ROUTES.SIGNUP)
+                  }
                 />
               )}
             </Stack.Screen>

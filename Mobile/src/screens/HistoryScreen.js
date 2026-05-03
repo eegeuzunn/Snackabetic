@@ -15,11 +15,21 @@ import { APP_ROUTES } from "../constants/routes";
 import theme from "../theme";
 
 // ─── Item card components ─────────────────────────────────────────────────────
-function MealCard({ item }) {
-  const carbs = item.totalCarbsG != null ? `${parseFloat(item.totalCarbsG).toFixed(1)} g` : "—";
-  const cal = item.totalCalories != null ? `${Math.round(item.totalCalories)} kcal` : null;
+function MealCard({ item, onPress }) {
+  const carbs =
+    item.totalCarbsG != null
+      ? `${parseFloat(item.totalCarbsG).toFixed(1)} g`
+      : "—";
+  const cal =
+    item.totalCalories != null
+      ? `${Math.round(item.totalCalories)} kcal`
+      : null;
   return (
-    <View style={[styles.card, styles.mealCard]}>
+    <TouchableOpacity
+      style={[styles.card, styles.mealCard]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
       <View style={[styles.cardIcon, { backgroundColor: "#EFF6FF" }]}>
         <Feather name="coffee" size={18} color={theme.colors.primary} />
       </View>
@@ -30,14 +40,18 @@ function MealCard({ item }) {
         </Text>
         <Text style={styles.cardTime}>{formatTime(item.timestamp)}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
-function GlucoseCard({ item }) {
+function GlucoseCard({ item, onPress }) {
   const level = getGlucoseLevel(item.valueMgDl);
   return (
-    <View style={[styles.card, styles.glucoseCard]}>
+    <TouchableOpacity
+      style={[styles.card, styles.glucoseCard]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
       <View style={[styles.cardIcon, { backgroundColor: "#FEF2F2" }]}>
         <Feather name="activity" size={18} color="#EF4444" />
       </View>
@@ -52,13 +66,17 @@ function GlucoseCard({ item }) {
         {item.notes ? <Text style={styles.cardNote}>{item.notes}</Text> : null}
         <Text style={styles.cardTime}>{formatTime(item.timestamp)}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
-function InsulinCard({ item }) {
+function InsulinCard({ item, onPress }) {
   return (
-    <View style={[styles.card, styles.insulinCard]}>
+    <TouchableOpacity
+      style={[styles.card, styles.insulinCard]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
       <View style={[styles.cardIcon, { backgroundColor: "#F5F3FF" }]}>
         <Feather name="droplet" size={18} color="#8B5CF6" />
       </View>
@@ -68,7 +86,7 @@ function InsulinCard({ item }) {
         {item.notes ? <Text style={styles.cardNote}>{item.notes}</Text> : null}
         <Text style={styles.cardTime}>{formatTime(item.timestamp)}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -94,7 +112,9 @@ export default function HistoryScreen({ navigation }) {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
     const unsub = navigation.addListener("focus", () => load(true));
@@ -142,7 +162,12 @@ export default function HistoryScreen({ navigation }) {
           style={styles.ctaBtn}
           onPress={() => navigation.navigate(APP_ROUTES.CAMERA)}
         >
-          <Feather name="camera" size={16} color="#fff" style={{ marginRight: 6 }} />
+          <Feather
+            name="camera"
+            size={16}
+            color="#fff"
+            style={{ marginRight: 6 }}
+          />
           <Text style={styles.ctaText}>Yemek Tara</Text>
         </TouchableOpacity>
       </View>
@@ -154,7 +179,10 @@ export default function HistoryScreen({ navigation }) {
     <FlatList
       data={records}
       keyExtractor={(item) => item.id}
-      contentContainerStyle={[styles.list, { paddingTop: insets.top + theme.spacing.lg }]}
+      contentContainerStyle={[
+        styles.list,
+        { paddingTop: insets.top + theme.spacing.lg },
+      ]}
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
@@ -163,14 +191,41 @@ export default function HistoryScreen({ navigation }) {
         />
       }
       renderItem={({ item }) => {
-        if (item.type === "MEAL")    return <MealCard item={item} />;
-        if (item.type === "GLUCOSE") return <GlucoseCard item={item} />;
-        if (item.type === "INSULIN") return <InsulinCard item={item} />;
+        if (item.type === "MEAL") {
+          return (
+            <MealCard
+              item={item}
+              onPress={() =>
+                navigation.navigate(APP_ROUTES.MEAL_DETAIL, {
+                  mealId: item.sourceId,
+                })
+              }
+            />
+          );
+        }
+        if (item.type === "GLUCOSE") {
+          return (
+            <GlucoseCard
+              item={item}
+              onPress={() =>
+                navigation.navigate(APP_ROUTES.HISTORY_DETAIL, { record: item })
+              }
+            />
+          );
+        }
+        if (item.type === "INSULIN") {
+          return (
+            <InsulinCard
+              item={item}
+              onPress={() =>
+                navigation.navigate(APP_ROUTES.HISTORY_DETAIL, { record: item })
+              }
+            />
+          );
+        }
         return null;
       }}
-      ListHeaderComponent={
-        <Text style={styles.pageTitle}>Geçmiş</Text>
-      }
+      ListHeaderComponent={<Text style={styles.pageTitle}>Geçmiş</Text>}
     />
   );
 }
@@ -189,8 +244,8 @@ function formatTime(ts) {
 
 function getGlucoseLevel(val) {
   if (val == null) return { label: "—", bg: theme.colors.border };
-  if (val < 70)   return { label: "Düşük", bg: "#FEE2E2" };
-  if (val > 180)  return { label: "Yüksek", bg: "#FEF3C7" };
+  if (val < 70) return { label: "Düşük", bg: "#FEE2E2" };
+  if (val > 180) return { label: "Yüksek", bg: "#FEF3C7" };
   return { label: "Normal", bg: "#D1FAE5" };
 }
 
@@ -226,7 +281,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
     gap: theme.spacing.md,
   },
-  mealCard:    { borderLeftWidth: 4, borderLeftColor: theme.colors.primary },
+  mealCard: { borderLeftWidth: 4, borderLeftColor: theme.colors.primary },
   glucoseCard: { borderLeftWidth: 4, borderLeftColor: "#EF4444" },
   insulinCard: { borderLeftWidth: 4, borderLeftColor: "#8B5CF6" },
 
@@ -239,7 +294,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cardBody: { flex: 1 },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm, marginBottom: 2 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+    marginBottom: 2,
+  },
   cardTitle: {
     ...theme.typography.body,
     fontFamily: "Outfit_700Bold",
