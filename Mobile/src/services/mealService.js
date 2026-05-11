@@ -22,3 +22,8 @@ export async function getMealById(id) {
   if (!id) return null;
   return api.get(`/meals/${id}`);
 }
+
+export async function deleteMeal(id) {
+  if (!id) return null;
+  return api.delete(`/meals/${id}`);
+}

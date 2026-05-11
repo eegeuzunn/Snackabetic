@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -10,16 +11,17 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { getMealById } from "../services/mealService";
+import { deleteMeal, getMealById } from "../services/mealService";
 import { getFoodById } from "../services/foodService";
 import theme from "../theme";
 
-export default function MealDetailScreen({ route }) {
+export default function MealDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const mealId = route.params?.mealId;
   const [meal, setMeal] = useState(null);
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
@@ -56,6 +58,28 @@ export default function MealDetailScreen({ route }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  function handleDelete() {
+    if (!mealId || isDeleting) return;
+    Alert.alert("Öğünü Sil", "Bu öğünü silmek istediğine emin misin?", [
+      { text: "İptal", style: "cancel" },
+      {
+        text: "Sil",
+        style: "destructive",
+        onPress: async () => {
+          setIsDeleting(true);
+          try {
+            await deleteMeal(mealId);
+            navigation.goBack();
+          } catch (e) {
+            Alert.alert("Silme Hatası", e.message || "Lütfen tekrar deneyin.");
+          } finally {
+            setIsDeleting(false);
+          }
+        },
+      },
+    ]);
+  }
 
   if (isLoading) {
     return (
@@ -173,6 +197,17 @@ export default function MealDetailScreen({ route }) {
           Değerler sisteme kaydedilen öğün verilerinden gelir.
         </Text>
       </View>
+
+      <TouchableOpacity
+        style={[styles.deleteBtn, isDeleting && styles.deleteBtnDisabled]}
+        onPress={handleDelete}
+        activeOpacity={0.8}
+        disabled={isDeleting}
+      >
+        <Text style={styles.deleteText}>
+          {isDeleting ? "Siliniyor..." : "Öğünü Sil"}
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -342,4 +377,17 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   infoText: { ...theme.typography.caption, color: theme.colors.textSecondary },
+
+  deleteBtn: {
+    marginTop: theme.spacing.xl,
+    backgroundColor: theme.colors.danger,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  deleteBtnDisabled: { opacity: 0.6 },
+  deleteText: {
+    color: "#fff",
+    fontFamily: "Outfit_700Bold",
+  },
 });

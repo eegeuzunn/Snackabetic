@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { clearToken, getToken, saveToken } from "../services/authStorage";
 import { setUnauthorizedHandler } from "../services/api";
-import { login as apiLogin, register as apiRegister } from "../services/authService";
+import {
+  login as apiLogin,
+  register as apiRegister,
+  me as apiMe,
+} from "../services/authService";
 
 export default function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
@@ -15,8 +19,30 @@ export default function useAuth() {
     async function bootstrapAuth() {
       try {
         const storedToken = await getToken();
-        if (mounted) {
-          setToken(storedToken);
+        if (!mounted) return;
+
+        if (!storedToken) {
+          setToken(null);
+          return;
+        }
+
+        try {
+          const meData = await apiMe();
+          if (!meData?.id) {
+            await clearToken();
+            if (mounted) {
+              setToken(null);
+            }
+            return;
+          }
+          if (mounted) {
+            setToken(storedToken);
+          }
+        } catch (error) {
+          await clearToken();
+          if (mounted) {
+            setToken(null);
+          }
         }
       } finally {
         if (mounted) {
@@ -51,22 +77,25 @@ export default function useAuth() {
   }, []);
 
   // ── Sign up: register then auto sign in, then show onboarding ────────
-  const signUp = useCallback(async ({ email, password, firstName, lastName, phone }) => {
-    if (!email || !password) {
-      throw new Error("Email ve şifre zorunludur.");
-    }
+  const signUp = useCallback(
+    async ({ email, password, firstName, lastName, phone }) => {
+      if (!email || !password) {
+        throw new Error("Email ve şifre zorunludur.");
+      }
 
-    const { token: jwt } = await apiRegister(
-      email.trim(),
-      password.trim(),
-      firstName?.trim(),
-      lastName?.trim(),
-      phone?.trim()
-    );
-    await saveToken(jwt);
-    setNeedsOnboarding(true);
-    setToken(jwt);
-  }, []);
+      const { token: jwt } = await apiRegister(
+        email.trim(),
+        password.trim(),
+        firstName?.trim(),
+        lastName?.trim(),
+        phone?.trim(),
+      );
+      await saveToken(jwt);
+      setNeedsOnboarding(true);
+      setToken(jwt);
+    },
+    [],
+  );
 
   // ── Complete onboarding ───────────────────────────────────────────────
   const completeOnboarding = useCallback(() => {
@@ -90,6 +119,14 @@ export default function useAuth() {
       signOut,
       completeOnboarding,
     }),
-    [isLoading, needsOnboarding, signIn, signUp, signOut, token, completeOnboarding],
+    [
+      isLoading,
+      needsOnboarding,
+      signIn,
+      signUp,
+      signOut,
+      token,
+      completeOnboarding,
+    ],
   );
 }

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   RefreshControl,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -174,10 +174,12 @@ export default function HistoryScreen({ navigation }) {
     );
   }
 
+  const sections = buildSections(records);
+
   // ── List ──────────────────────────────────────────────────────────
   return (
-    <FlatList
-      data={records}
+    <SectionList
+      sections={sections}
       keyExtractor={(item) => item.id}
       contentContainerStyle={[
         styles.list,
@@ -190,6 +192,7 @@ export default function HistoryScreen({ navigation }) {
           tintColor={theme.colors.primary}
         />
       }
+      stickySectionHeadersEnabled={false}
       renderItem={({ item }) => {
         if (item.type === "MEAL") {
           return (
@@ -225,12 +228,74 @@ export default function HistoryScreen({ navigation }) {
         }
         return null;
       }}
+      renderSectionHeader={({ section }) => (
+        <View
+          style={[
+            styles.sectionHeader,
+            section.key === "today" && styles.sectionHeaderFirst,
+          ]}
+        >
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <View style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>{section.data.length}</Text>
+            </View>
+          </View>
+          {section.data.length === 0 ? (
+            <Text style={styles.sectionEmptyText}>{section.emptyText}</Text>
+          ) : null}
+        </View>
+      )}
       ListHeaderComponent={<Text style={styles.pageTitle}>Geçmiş</Text>}
     />
   );
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+function buildSections(records) {
+  const todayRecords = [];
+  const pastRecords = [];
+
+  for (const record of records) {
+    if (isToday(record.timestamp)) {
+      todayRecords.push(record);
+    } else {
+      pastRecords.push(record);
+    }
+  }
+
+  return [
+    {
+      key: "today",
+      title: "Bugün",
+      emptyText: "Bugün kayıt yok.",
+      data: todayRecords,
+    },
+    {
+      key: "past",
+      title: "Geçmiş",
+      emptyText: "Geçmişte kayıt yok.",
+      data: pastRecords,
+    },
+  ];
+}
+
+function isToday(ts) {
+  if (!ts) return false;
+  const date = new Date(ts);
+  if (Number.isNaN(date.getTime())) return false;
+  const now = new Date();
+  return isSameDay(date, now);
+}
+
+function isSameDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
 function formatTime(ts) {
   if (!ts) return "";
   const d = new Date(ts);
@@ -267,6 +332,49 @@ const styles = StyleSheet.create({
     ...theme.typography.heading,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.lg,
+  },
+
+  // Section headers
+  sectionHeader: {
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+  },
+  sectionHeaderFirst: {
+    marginTop: 0,
+  },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionTitle: {
+    ...theme.typography.caption,
+    fontFamily: "Outfit_700Bold",
+    color: theme.colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  sectionBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  sectionBadgeText: {
+    ...theme.typography.caption,
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    fontFamily: "Outfit_700Bold",
+  },
+  sectionEmptyText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
   },
 
   // Card base

@@ -53,10 +53,10 @@ api.interceptors.response.use(
     }
     // Surface a clean error message from the backend when available
     const message =
-      error.response?.data?.message ||
-      error.message ||
-      "Bir hata oluştu.";
-    return Promise.reject(new Error(message));
+      error.response?.data?.message || error.message || "Bir hata oluştu.";
+    const wrapped = new Error(message);
+    wrapped.status = error.response?.status;
+    return Promise.reject(wrapped);
   },
 );
 
