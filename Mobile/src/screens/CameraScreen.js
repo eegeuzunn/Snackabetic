@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { analyzeImage } from "../services/analyzeService";
+import { analyzeImage, FoodNotDetectedError } from "../services/analyzeService";
 import { APP_ROUTES } from "../constants/routes";
 import theme from "../theme";
 
@@ -110,6 +110,12 @@ export default function CameraScreen({ navigation, route }) {
         returnToMeal,
       });
     } catch (error) {
+      if (error instanceof FoodNotDetectedError) {
+        Alert.alert("Yemek Algılanamadı", error.message, [
+          { text: "Tekrar Çek", onPress: reset },
+        ]);
+        return;
+      }
       Alert.alert("Analiz Hatası", error.message || "Lütfen tekrar deneyin.");
     } finally {
       setIsAnalyzing(false);

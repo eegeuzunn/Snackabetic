@@ -7,6 +7,16 @@ import {
 
 const HEIC_EXTENSIONS = [".heic", ".heif"];
 
+export const FOOD_NOT_DETECTED_CODE = "FOOD_NOT_DETECTED";
+
+export class FoodNotDetectedError extends Error {
+  constructor(message = "Yemek algılanamadı. Lütfen tabaktaki yemeği net şekilde çekin.") {
+    super(message);
+    this.name = "FoodNotDetectedError";
+    this.code = FOOD_NOT_DETECTED_CODE;
+  }
+}
+
 function isHeicUri(uri) {
   if (!uri) return false;
   const lower = uri.split("?")[0].toLowerCase();
@@ -85,6 +95,10 @@ export async function analyzeImage(imageUri) {
 
   if (!top) {
     throw new Error("AI servisi tahmin döndürmedi.");
+  }
+
+  if (json.food_detected === false) {
+    throw new FoodNotDetectedError();
   }
 
   return {

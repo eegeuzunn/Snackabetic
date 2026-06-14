@@ -174,6 +174,11 @@ for canonical, aliases in CLASS_MERGE_GROUPS.items():
     for alias in aliases:
         MERGE_CANONICAL[alias] = canonical
 
+# Yemek dışı / alakasız görüntü reddi (softmax her zaman bir sınıf seçer)
+FOOD_DETECT_HARD_REJECT_CONFIDENCE = 0.15   # altı → kesin red
+FOOD_DETECT_MIN_CONFIDENCE         = 0.22   # + düşük doluluk → red
+FOOD_DETECT_MIN_FILL_RATIO         = 0.10   # kadrajda yemek alanı oranı
+
 # ─── YEMEk ŞEKİL PROFİLLERİ ──────────────────────────────────────────────────
 # Kategori: "flat" | "volumetric" | "soup" | "drink" | "fruit"
 #
@@ -779,6 +784,15 @@ def health():
     })
 
 
+def _evaluate_food_detection(top_conf: float, food_fill_ratio: float) -> tuple[bool, str | None]:
+    """Görüntüde yemek olup olmadığını değerlendirir."""
+    if top_conf < FOOD_DETECT_HARD_REJECT_CONFIDENCE:
+        return False, "low_confidence"
+    if top_conf < FOOD_DETECT_MIN_CONFIDENCE and food_fill_ratio < FOOD_DETECT_MIN_FILL_RATIO:
+        return False, "low_confidence_and_fill"
+    return True, None
+
+
 def _run_pipeline(pil_img, plate_diam, cam_height, top_k):
     """Ortak pipeline — hem /analyze hem /analyze-base64 kullanır."""
     # 1. Yemek tanıma
@@ -819,6 +833,9 @@ def _run_pipeline(pil_img, plate_diam, cam_height, top_k):
     else:
         confidence_level = "low"
 
+    food_fill_ratio = est["food_pixel_ratio"]
+    food_detected, rejection_reason = _evaluate_food_detection(top_conf, food_fill_ratio)
+
     # 7. Top-5 — her aday için kendi şekil profiline göre ayrı gram tahmini
     top5 = []
     for food, conf in predictions:
@@ -855,11 +872,13 @@ def _run_pipeline(pil_img, plate_diam, cam_height, top_k):
         },
         "top5":             top5,
         "confidence_level": confidence_level,
+        "food_detected":    food_detected,
+        "rejection_reason": rejection_reason,
         "estimation_method": est["method"],
         "scale_confidence": sc,
         "depth_model":      depth_estimator.mode,
         "plate_calibrated": plate_diam is not None,
-        "food_fill_ratio":  est["food_pixel_ratio"],
+        "food_fill_ratio":  food_fill_ratio,
     }
 
 
