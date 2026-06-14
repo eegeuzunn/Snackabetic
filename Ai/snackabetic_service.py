@@ -168,7 +168,6 @@ DEFAULT_NUTRITION = (200, 20.0, 10.0, 8.0, 0.90)
 # Inference-time sınıf birleştirme: aynı yemeğin farklı etiketlerini tek sınıfta topla
 CLASS_MERGE_GROUPS = {
     "omlet": ["omlet", "omelette"],
-    "tavuk-sote": ["tavuk-sote", "chicken_wings"],
 }
 MERGE_CANONICAL = {}
 for canonical, aliases in CLASS_MERGE_GROUPS.items():
@@ -434,26 +433,117 @@ class DepthEstimator:
 
 
 # ─── 3. YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────
-def _get_food_mask(img_arr: np.ndarray) -> np.ndarray:
-    """HSV tabanlı yemek maskesi döner (bool array)."""
+def _plate_circle_mask(img_h: int, img_w: int, plate_px_diam, plate_ctr):
+    """Tabak dairesi bool maskesi; tespit yoksa None."""
+    if not plate_px_diam or not plate_ctr:
+        return None
+    px_cx, px_cy = plate_ctr
+    r = plate_px_diam // 2
+    yy, xx = np.ogrid[:img_h, :img_w]
+    return (xx - px_cx) ** 2 + (yy - px_cy) ** 2 <= r ** 2
+
+
+def _get_food_mask(
+    img_arr: np.ndarray,
+    depth_map: np.ndarray = None,
+    plate_circle: np.ndarray = None,
+) -> np.ndarray:
+    """Renk + derinlik + tabak kısıtı ile yemek maskesi döner."""
     import cv2
+
     h, w = img_arr.shape[:2]
-    img_hsv  = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
+    img_hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
     sat, bri = img_hsv[:, :, 1], img_hsv[:, :, 2]
-    mask = (sat > 25) & (bri > 30) & (bri < 240)
-    mask = ndimage.binary_erosion(mask, iterations=1)
-    mask = ndimage.binary_dilation(mask, iterations=2)
+
+    # Renkli, aşırı parlak/karanlık olmayan pikseller
+    mask = (sat > 20) & (bri > 35) & (bri < 235)
+    # Beyaz/gri tabak ve masa yüzeyini çıkar
+    mask &= ~((sat < 45) & (bri > 165))
+    mask &= bri >= 25
+
+    if plate_circle is not None:
+        mask &= plate_circle
+
+    if depth_map is not None and depth_map.shape[:2] == (h, w) and mask.any():
+        depth_in_mask = depth_map[mask]
+        if depth_in_mask.size > 50:
+            depth_thresh = np.percentile(depth_in_mask, 30)
+            mask &= depth_map >= depth_thresh
+
+    mask = ndimage.binary_opening(mask, iterations=2)
+    mask = ndimage.binary_closing(mask, iterations=3)
 
     labeled, n = ndimage.label(mask)
     if n == 0:
-        return np.ones((h, w), dtype=bool)
+        cy, cx = h // 2, w // 2
+        yy, xx = np.ogrid[:h, :w]
+        center = ((xx - cx) ** 2 + (yy - cy) ** 2) <= (min(h, w) * 0.35) ** 2
+        if plate_circle is not None:
+            return plate_circle & center
+        return center
 
-    cy, cx     = h // 2, w // 2
-    center_lbl = labeled[cy, cx]
-    if center_lbl == 0:
-        sizes      = ndimage.sum(mask, labeled, range(1, n + 1))
-        center_lbl = int(np.argmax(sizes)) + 1
-    return labeled == center_lbl
+    cy, cx = h // 2, w // 2
+    max_dist = max(np.sqrt(cx ** 2 + cy ** 2), 1.0)
+    best_lbl, best_score = 1, -1.0
+    min_area = mask.size * 0.01
+
+    for lbl in range(1, n + 1):
+        comp = labeled == lbl
+        area = comp.sum()
+        if area < min_area:
+            continue
+        ys, xs = np.where(comp)
+        dist = np.sqrt((xs.mean() - cx) ** 2 + (ys.mean() - cy) ** 2)
+        score = area * (1.0 / (1.0 + dist / max_dist))
+        if score > best_score:
+            best_score = score
+            best_lbl = lbl
+
+    return labeled == best_lbl
+
+
+def _align_depth_map(depth_map: np.ndarray, img_h: int, img_w: int) -> np.ndarray:
+    if depth_map.shape[0] == img_h and depth_map.shape[1] == img_w:
+        return depth_map
+    return ndimage.zoom(
+        depth_map,
+        (img_h / depth_map.shape[0], img_w / depth_map.shape[1]),
+        order=1,
+    )
+
+
+def _prepare_estimation_context(
+    depth_map: np.ndarray,
+    pil_image: Image.Image,
+    plate_diameter_cm: float = None,
+    camera_height_cm: float = 30.0,
+) -> dict:
+    """Maske, ölçek ve alan hesaplarını bir kez üretir (top-5 için paylaşılır)."""
+    img_arr = np.array(pil_image.convert("RGB"))
+    img_h, img_w = img_arr.shape[:2]
+    depth_map = _align_depth_map(depth_map, img_h, img_w)
+
+    plate_px_diam, plate_ctr = _detect_plate(img_arr)
+    plate_circle = _plate_circle_mask(img_h, img_w, plate_px_diam, plate_ctr)
+    mask = _get_food_mask(img_arr, depth_map=depth_map, plate_circle=plate_circle)
+
+    cm_per_px, scale_confidence = _get_scale(
+        img_w, plate_px_diam, plate_diameter_cm, camera_height_cm
+    )
+    pixel_area_cm2 = cm_per_px ** 2
+
+    return {
+        "img_h": img_h,
+        "img_w": img_w,
+        "depth_map": depth_map,
+        "mask": mask,
+        "plate_px_diam": plate_px_diam,
+        "cm_per_px": cm_per_px,
+        "scale_confidence": scale_confidence,
+        "pixel_area_cm2": pixel_area_cm2,
+        "food_area_cm2": float(mask.sum()) * pixel_area_cm2,
+        "food_pixel_ratio": float(mask.sum()) / mask.size,
+    }
 
 
 def _crop_food_region(
@@ -562,44 +652,29 @@ def estimate_weight(
     density:           float,
     camera_height_cm:  float = 30.0,
     plate_diameter_cm: float = None,
+    context:           dict = None,
 ) -> dict:
     """
     Yemek kategorisine göre farklı tahmin stratejisi uygular.
     Döner: dict  {weight_g, volume_ml, food_pixel_ratio, scale_confidence, method}
     """
-    img_arr          = np.array(pil_image.convert("RGB"))
-    img_h, img_w     = img_arr.shape[:2]
-    profile          = FOOD_SHAPE_PROFILES.get(food_name)
-    category         = profile[3] if profile else "volumetric"
-    min_g, max_g     = (profile[0], profile[1]) if profile else (80, 600)
-    thickness_cm     = profile[2] if profile else None
-
-    # Depth map boyut eşleştirme
-    if depth_map.shape[0] != img_h or depth_map.shape[1] != img_w:
-        depth_map = ndimage.zoom(
-            depth_map,
-            (img_h / depth_map.shape[0], img_w / depth_map.shape[1]),
-            order=1,
+    if context is None:
+        context = _prepare_estimation_context(
+            depth_map, pil_image, plate_diameter_cm, camera_height_cm
         )
 
-    # Ortak hesaplamalar
-    mask                    = _get_food_mask(img_arr)
-    plate_px_diam, plate_ctr = _detect_plate(img_arr)
+    profile      = FOOD_SHAPE_PROFILES.get(food_name)
+    category     = profile[3] if profile else "volumetric"
+    min_g, max_g = (profile[0], profile[1]) if profile else (80, 600)
+    thickness_cm = profile[2] if profile else None
 
-    # Plak varsa maskeyi plak dairesine kısıtla
-    if plate_px_diam and plate_ctr:
-        px_cx, px_cy = plate_ctr
-        r            = plate_px_diam // 2
-        yy, xx       = np.ogrid[:img_h, :img_w]
-        plate_circle = (xx - px_cx) ** 2 + (yy - px_cy) ** 2 <= r ** 2
-        mask         = mask & plate_circle
-
-    food_pixel_ratio = float(mask.sum()) / mask.size
-    cm_per_px, scale_confidence = _get_scale(
-        img_w, plate_px_diam, plate_diameter_cm, camera_height_cm
-    )
-    pixel_area_cm2  = cm_per_px ** 2
-    food_area_cm2   = float(mask.sum()) * pixel_area_cm2
+    mask               = context["mask"]
+    depth_map          = context["depth_map"]
+    scale_confidence   = context["scale_confidence"]
+    cm_per_px          = context["cm_per_px"]
+    pixel_area_cm2     = context["pixel_area_cm2"]
+    food_area_cm2      = context["food_area_cm2"]
+    food_pixel_ratio   = context["food_pixel_ratio"]
 
     # ── Strateji: FLAT ────────────────────────────────────────────────────────
     if category == "flat":
@@ -716,12 +791,14 @@ def _run_pipeline(pil_img, plate_diam, cam_height, top_k):
 
     # 3. Derinlik (volumetric kategoriler için kullanılır)
     depth_map = depth_estimator.predict(pil_img)
+    est_ctx   = _prepare_estimation_context(depth_map, pil_img, plate_diam, cam_height)
 
     # 4. Porsiyon tahmini
     est = estimate_weight(
         depth_map, pil_img, top_food, density,
         camera_height_cm=cam_height,
         plate_diameter_cm=plate_diam,
+        context=est_ctx,
     )
     weight_g  = est["weight_g"]
     volume_ml = est["volume_ml"]
@@ -742,19 +819,27 @@ def _run_pipeline(pil_img, plate_diam, cam_height, top_k):
     else:
         confidence_level = "low"
 
-    # 7. Top-5
+    # 7. Top-5 — her aday için kendi şekil profiline göre ayrı gram tahmini
     top5 = []
     for food, conf in predictions:
         n = NUTRITION_DB.get(food, DEFAULT_NUTRITION)
-        cal100, carb100, prot100, fat100, _ = n
-        factor = weight_g / 100.0
+        cal100, carb100, prot100, fat100, food_density = n
+        alt_est = estimate_weight(
+            depth_map, pil_img, food, food_density,
+            camera_height_cm=cam_height,
+            plate_diameter_cm=plate_diam,
+            context=est_ctx,
+        )
+        alt_weight = alt_est["weight_g"]
+        factor = alt_weight / 100.0
         top5.append({
-            "food_name":          food,
-            "confidence":         round(conf, 4),
-            "calories_estimated": round(cal100 * factor),
-            "carbs_g_estimated":  round(carb100 * factor, 1),
+            "food_name":           food,
+            "confidence":          round(conf, 4),
+            "weight_g_estimated":  alt_weight,
+            "calories_estimated":  round(cal100 * factor),
+            "carbs_g_estimated":   round(carb100 * factor, 1),
             "protein_g_estimated": round(prot100 * factor, 1),
-            "fat_g_estimated":    round(fat100 * factor, 1),
+            "fat_g_estimated":     round(fat100 * factor, 1),
         })
 
     return {

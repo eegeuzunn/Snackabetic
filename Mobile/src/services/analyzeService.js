@@ -1,5 +1,9 @@
 import * as ImageManipulator from "expo-image-manipulator";
-import { AI_SERVICE_URL } from "../constants/config";
+import {
+  AI_SERVICE_URL,
+  CAMERA_HEIGHT_CM,
+  PLATE_DIAMETER_CM,
+} from "../constants/config";
 
 const HEIC_EXTENSIONS = [".heic", ".heif"];
 
@@ -48,6 +52,8 @@ export async function analyzeImage(imageUri) {
     name: filename,
     type: "image/jpeg",
   });
+  formData.append("plate_diameter_cm", String(PLATE_DIAMETER_CM));
+  formData.append("camera_height_cm", String(CAMERA_HEIGHT_CM));
 
   let response;
   try {
@@ -93,6 +99,9 @@ export async function analyzeImage(imageUri) {
     top5: (json.top5 ?? []).map((item) => ({
       foodName: item.food_name ?? item.foodName ?? "",
       confidence: Number(item.confidence ?? 0),
+      weightGEstimated: Number(
+        item.weight_g_estimated ?? item.weightGEstimated ?? 0,
+      ),
       caloriesEstimated: Number(
         item.calories_estimated ?? item.caloriesEstimated ?? 0,
       ),

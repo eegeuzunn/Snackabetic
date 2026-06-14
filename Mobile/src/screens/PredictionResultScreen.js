@@ -67,12 +67,14 @@ function computeNutritionAtWeight(food, weightG) {
 function statsFromAlternativeItem(item) {
   const carbs = item?.carbsGEstimated ?? item?.carbs_g_estimated;
   const calories = item?.caloriesEstimated ?? item?.calories_estimated;
-  if (carbs == null && calories == null) {
+  const weightG = item?.weightGEstimated ?? item?.weight_g_estimated;
+  if (carbs == null && calories == null && weightG == null) {
     return null;
   }
   return {
     carbsG: Number(carbs ?? 0),
     calories: Number(calories ?? 0),
+    weightG: Number(weightG ?? 0),
   };
 }
 
@@ -112,6 +114,7 @@ export default function PredictionResultScreen({ route, navigation }) {
   const [activeFoodName, setActiveFoodName] = useState(
     prediction?.foodName ?? "Bilinmiyor",
   );
+  const [activeWeightG, setActiveWeightG] = useState(prediction?.weightG ?? 0);
   const [activeCarbsG, setActiveCarbsG] = useState(prediction?.carbsG ?? 0);
   const [activeCalories, setActiveCalories] = useState(
     prediction?.calories ?? 0,
@@ -125,6 +128,7 @@ export default function PredictionResultScreen({ route, navigation }) {
   const topPredictionStatsRef = useRef({
     carbsG: prediction?.carbsG ?? 0,
     calories: prediction?.calories ?? 0,
+    weightG: prediction?.weightG ?? 0,
   });
   const nutritionCacheRef = useRef(new Map());
 
@@ -199,12 +203,24 @@ export default function PredictionResultScreen({ route, navigation }) {
   function applyNutritionStats(stats) {
     setActiveCarbsG(stats?.carbsG ?? 0);
     setActiveCalories(stats?.calories ?? 0);
+    if (stats?.weightG > 0) {
+      setActiveWeightG(stats.weightG);
+      setGram(String(stats.weightG));
+    }
+  }
+
+  function getAlternativeWeightG(item) {
+    const fromItem = statsFromAlternativeItem(item);
+    if (fromItem?.weightG > 0) {
+      return fromItem.weightG;
+    }
+    return prediction?.weightG ?? 0;
   }
 
   async function resolveAlternativeNutrition(foodName, item) {
     const normalized = normalizeFoodName(foodName);
     const topNormalized = normalizeFoodName(prediction?.foodName ?? "");
-    const weightG = prediction?.weightG ?? 0;
+    const weightG = getAlternativeWeightG(item);
 
     if (normalized === topNormalized) {
       return topPredictionStatsRef.current;
@@ -220,7 +236,10 @@ export default function PredictionResultScreen({ route, navigation }) {
       const results = await searchFoods(normalized);
       const match = findFoodMatch(results, foodName);
       if (match) {
-        const computed = computeNutritionAtWeight(match, weightG);
+        const computed = {
+          ...computeNutritionAtWeight(match, weightG),
+          weightG,
+        };
         nutritionCacheRef.current.set(normalized, computed);
         return computed;
       }
@@ -228,12 +247,15 @@ export default function PredictionResultScreen({ route, navigation }) {
       // Backend araması başarısız olursa API tahminine düş
     }
 
-    if (fromItem && (fromItem.carbsG > 0 || fromItem.calories > 0)) {
+    if (
+      fromItem &&
+      (fromItem.carbsG > 0 || fromItem.calories > 0 || fromItem.weightG > 0)
+    ) {
       nutritionCacheRef.current.set(normalized, fromItem);
       return fromItem;
     }
 
-    return { carbsG: 0, calories: 0 };
+    return { carbsG: 0, calories: 0, weightG };
   }
 
   async function selectAlternative(item) {
@@ -508,7 +530,7 @@ export default function PredictionResultScreen({ route, navigation }) {
           <View style={styles.statsRow}>
             <StatBox
               label="Tahmini Ağırlık"
-              value={`${prediction?.weightG ?? 0} g`}
+              value={`${activeWeightG} g`}
             />
             <StatBox label="Karbonhidrat" value={`${activeCarbsG} g`} />
             <StatBox label="Kalori" value={`${activeCalories} kcal`} />
