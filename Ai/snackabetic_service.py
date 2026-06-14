@@ -713,6 +713,12 @@ def _run_pipeline(pil_img, plate_diam, cam_height, top_k):
     }
 
 
+def _log_analyze_exchange(endpoint, request_payload, response_payload):
+    """Gelen isteği ve dönen cevabı olduğu gibi logla."""
+    logger.info("[%s] REQUEST:\n%s", endpoint, json.dumps(request_payload, ensure_ascii=False, indent=2))
+    logger.info("[%s] RESPONSE:\n%s", endpoint, json.dumps(response_payload, ensure_ascii=False, indent=2))
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
     """
@@ -745,18 +751,25 @@ def analyze():
             ratio   = max_dim / max(w, h)
             pil_img = pil_img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
 
-        result = _run_pipeline(pil_img, plate_diam, cam_height, top_k)
-        result["processing_ms"] = int((time.time() - t_start) * 1000)
+        image_file = request.files["image"]
+        request_log = {
+            "plate_diameter_cm": plate_diam,
+            "camera_height_cm": cam_height,
+            "top_k": top_k,
+            "image": {
+                "filename": image_file.filename,
+                "content_type": image_file.content_type,
+                "size_bytes": len(raw),
+                "width": pil_img.size[0],
+                "height": pil_img.size[1],
+            },
+        }
 
-        logger.info(
-            f"{result['top_prediction']['food_name']} | "
-            f"conf={result['top_prediction']['confidence']:.2f} | "
-            f"{result['top_prediction']['weight_g']}g | "
-            f"{result['top_prediction']['calories']}kcal | "
-            f"method={result['estimation_method']} | "
-            f"scale={result['scale_confidence']} | "
-            f"{result['processing_ms']}ms"
-        )
+        result = _run_pipeline(pil_img, plate_diam, cam_height, top_k)
+        processing_ms = int((time.time() - t_start) * 1000)
+        result["processing_ms"] = processing_ms
+
+        _log_analyze_exchange("/analyze", request_log, result)
         return jsonify(result)
 
     except Exception as e:

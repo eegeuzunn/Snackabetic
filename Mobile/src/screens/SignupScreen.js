@@ -1,5 +1,14 @@
-import React, { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View, ScrollView } from "react-native";
+import React, { useRef, useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import PrimaryButton from "../components/PrimaryButton";
 import ScreenContainer from "../components/ScreenContainer";
 import theme from "../theme";
@@ -11,6 +20,13 @@ export default function SignupScreen({ onSignup, onNavigateLogin }) {
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const scrollRef = useRef(null);
+
+  const scrollToBottomField = () => {
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
 
   const handleSignup = async () => {
     if (!email.trim() || !password.trim()) {
@@ -38,11 +54,22 @@ export default function SignupScreen({ onSignup, onNavigateLogin }) {
 
   return (
     <ScreenContainer>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Hesap Oluştur</Text>
-        <Text style={styles.subtitle}>Diyabet takibine başlamak için kayıt olun.</Text>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          ref={scrollRef}
+          style={styles.flex}
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>Hesap Oluştur</Text>
+          <Text style={styles.subtitle}>Diyabet takibine başlamak için kayıt olun.</Text>
 
-        <View style={styles.form}>
+          <View style={styles.form}>
           <Text style={styles.label}>Ad</Text>
           <TextInput
             placeholder="Adınız"
@@ -80,6 +107,7 @@ export default function SignupScreen({ onSignup, onNavigateLogin }) {
             style={styles.input}
             value={password}
             onChangeText={setPassword}
+            onFocus={scrollToBottomField}
           />
 
           <Text style={styles.label}>Şifre Tekrar</Text>
@@ -90,6 +118,7 @@ export default function SignupScreen({ onSignup, onNavigateLogin }) {
             style={styles.input}
             value={passwordConfirm}
             onChangeText={setPasswordConfirm}
+            onFocus={scrollToBottomField}
           />
 
           <PrimaryButton
@@ -97,21 +126,25 @@ export default function SignupScreen({ onSignup, onNavigateLogin }) {
             onPress={handleSignup}
             disabled={isSubmitting}
           />
-        </View>
+          </View>
 
-        <Text style={styles.loginLink} onPress={onNavigateLogin}>
-          Zaten hesabın var mı? <Text style={styles.loginLinkBold}>Giriş Yap</Text>
-        </Text>
-      </ScrollView>
+          <Text style={styles.loginLink} onPress={onNavigateLogin}>
+            Zaten hesabın var mı? <Text style={styles.loginLinkBold}>Giriş Yap</Text>
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   scroll: {
     flexGrow: 1,
-    justifyContent: "center",
     paddingVertical: theme.spacing.xxl,
+    paddingBottom: theme.spacing.xxl * 3,
   },
   title: {
     ...theme.typography.title,
