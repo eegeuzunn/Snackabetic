@@ -172,6 +172,14 @@ export default function CameraScreen({ navigation, route }) {
         <Text style={styles.topCancelBtnText}>İptal</Text>
       </TouchableOpacity>
 
+      <View style={styles.tipsOverlay}>
+        <Text style={styles.tipsTitle}>Daha iyi tanıma için</Text>
+        <Text style={styles.tipsText}>• Yemeği tabağın ortasına koyun</Text>
+        <Text style={styles.tipsText}>• Üstten çekin (45–90°)</Text>
+        <Text style={styles.tipsText}>• İyi ışık kullanın, flaşı kapatın</Text>
+        <Text style={styles.tipsText}>• Mümkünse sade tabak tercih edin</Text>
+      </View>
+
       <View style={styles.cameraControls}>
         <TouchableOpacity style={styles.galleryBtn} onPress={pickFromGallery}>
           <Text style={styles.galleryBtnText}>Galeri</Text>
@@ -247,6 +255,29 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     fontFamily: "Outfit_600SemiBold",
     marginLeft: 6,
+  },
+  tipsOverlay: {
+    position: "absolute",
+    top: 110,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 12,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  tipsTitle: {
+    color: "#fff",
+    ...theme.typography.caption,
+    fontFamily: "Outfit_600SemiBold",
+    marginBottom: 4,
+  },
+  tipsText: {
+    color: "rgba(255,255,255,0.9)",
+    ...theme.typography.caption,
+    lineHeight: 18,
   },
   cameraControls: {
     position: "absolute",

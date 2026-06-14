@@ -165,6 +165,16 @@ NUTRITION_DB = {
 }
 DEFAULT_NUTRITION = (200, 20.0, 10.0, 8.0, 0.90)
 
+# Inference-time sınıf birleştirme: aynı yemeğin farklı etiketlerini tek sınıfta topla
+CLASS_MERGE_GROUPS = {
+    "omlet": ["omlet", "omelette"],
+    "tavuk-sote": ["tavuk-sote", "chicken_wings"],
+}
+MERGE_CANONICAL = {}
+for canonical, aliases in CLASS_MERGE_GROUPS.items():
+    for alias in aliases:
+        MERGE_CANONICAL[alias] = canonical
+
 # ─── YEMEk ŞEKİL PROFİLLERİ ──────────────────────────────────────────────────
 # Kategori: "flat" | "volumetric" | "soup" | "drink" | "fruit"
 #
@@ -353,20 +363,19 @@ class FoodClassifier:
 
         logger.info(f"✅ EfficientNet-B3 yüklendi — {num_classes} sınıf, device: {self.device}")
 
-    def predict(self, pil_image: Image.Image, top_k: int = 5):
+    def predict(self, pil_image: Image.Image, top_k: int = 5, use_crop: bool = True):
         if self.model is None:
             raise RuntimeError("Model yüklenemedi!")
 
-        img_tensor = self.transform(pil_image).unsqueeze(0).to(self.device)
+        classify_img = _crop_food_region(pil_image) if use_crop else pil_image
+        img_tensor = self.transform(classify_img).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            output    = self.model(img_tensor)
-            probs     = torch.softmax(output, dim=1)[0]
-            top_probs, top_indices = probs.topk(top_k)
+            output = self.model(img_tensor)
+            probs  = torch.softmax(output, dim=1)[0]
 
-        return [
-            (self.idx_to_class[idx.item()], float(prob))
-            for prob, idx in zip(top_probs, top_indices)
-        ]
+        merged = _merge_class_probabilities(probs, self.idx_to_class)
+        sorted_items = sorted(merged.items(), key=lambda item: item[1], reverse=True)[:top_k]
+        return [(food, float(conf)) for food, conf in sorted_items]
 
 
 # ─── 2. DEPTH ESTIMATION MODELİ ───────────────────────────────────────────────
@@ -445,6 +454,57 @@ def _get_food_mask(img_arr: np.ndarray) -> np.ndarray:
         sizes      = ndimage.sum(mask, labeled, range(1, n + 1))
         center_lbl = int(np.argmax(sizes)) + 1
     return labeled == center_lbl
+
+
+def _crop_food_region(
+    pil_img: Image.Image,
+    pad: int = 20,
+    min_side: int = 80,
+) -> Image.Image:
+    """Yemek maskesine göre bounding-box kırp; çok küçükse orijinali döndür."""
+    arr = np.array(pil_img.convert("RGB"))
+    mask = _get_food_mask(arr)
+    ys, xs = np.where(mask)
+    if len(ys) == 0:
+        return pil_img
+
+    h, w = arr.shape[:2]
+    y0 = max(0, int(ys.min()) - pad)
+    y1 = min(h, int(ys.max()) + pad)
+    x0 = max(0, int(xs.min()) - pad)
+    x1 = min(w, int(xs.max()) + pad)
+
+    if (y1 - y0) < min_side or (x1 - x0) < min_side:
+        return pil_img
+
+    return Image.fromarray(arr[y0:y1, x0:x1])
+
+
+def _merge_class_probabilities(probs, idx_to_class: dict) -> dict:
+    """Benzer sınıfların softmax olasılıklarını birleştir."""
+    merged = {}
+    for idx, prob in enumerate(probs):
+        class_name = idx_to_class.get(idx)
+        if not class_name:
+            continue
+        canonical = MERGE_CANONICAL.get(class_name, class_name)
+        merged[canonical] = merged.get(canonical, 0.0) + float(prob)
+    return merged
+
+
+def _load_image_from_bytes(raw: bytes) -> Image.Image:
+    """JPEG/PNG/WEBP/HEIC byte dizisinden PIL RGB görüntü yükle."""
+    try:
+        return Image.open(io.BytesIO(raw)).convert("RGB")
+    except UnidentifiedImageError:
+        try:
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+            return Image.open(io.BytesIO(raw)).convert("RGB")
+        except Exception as exc:
+            raise UnidentifiedImageError(
+                "Geçersiz resim formatı. JPEG/PNG/HEIC gönderin."
+            ) from exc
 
 
 def _detect_plate(img_arr: np.ndarray):
@@ -683,11 +743,19 @@ def _run_pipeline(pil_img, plate_diam, cam_height, top_k):
         confidence_level = "low"
 
     # 7. Top-5
-    top5 = [{
-        "food_name":          food,
-        "confidence":         round(conf, 4),
-        "calories_estimated": round(NUTRITION_DB.get(food, DEFAULT_NUTRITION)[0] * weight_g / 100),
-    } for food, conf in predictions]
+    top5 = []
+    for food, conf in predictions:
+        n = NUTRITION_DB.get(food, DEFAULT_NUTRITION)
+        cal100, carb100, prot100, fat100, _ = n
+        factor = weight_g / 100.0
+        top5.append({
+            "food_name":          food,
+            "confidence":         round(conf, 4),
+            "calories_estimated": round(cal100 * factor),
+            "carbs_g_estimated":  round(carb100 * factor, 1),
+            "protein_g_estimated": round(prot100 * factor, 1),
+            "fat_g_estimated":    round(fat100 * factor, 1),
+        })
 
     return {
         "top_prediction": {
@@ -738,9 +806,9 @@ def analyze():
 
         raw = request.files["image"].read()
         try:
-            pil_img = Image.open(io.BytesIO(raw)).convert("RGB")
+            pil_img = _load_image_from_bytes(raw)
         except UnidentifiedImageError:
-            return jsonify({"error": "Geçersiz resim formatı. JPEG/PNG gönderin."}), 400
+            return jsonify({"error": "Geçersiz resim formatı. JPEG/PNG/HEIC gönderin."}), 400
 
         max_dim = 518
         w, h    = pil_img.size
@@ -794,7 +862,10 @@ def analyze_base64():
         return jsonify({"error": "image_base64 alanı eksik"}), 400
     try:
         img_bytes  = base64.b64decode(data["image_base64"])
-        pil_img    = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        try:
+            pil_img = _load_image_from_bytes(img_bytes)
+        except UnidentifiedImageError:
+            return jsonify({"error": "Geçersiz resim formatı. JPEG/PNG/HEIC gönderin."}), 400
         max_dim    = 518
         w, h       = pil_img.size
         if max(w, h) > max_dim:

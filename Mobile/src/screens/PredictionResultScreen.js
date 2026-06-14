@@ -41,6 +41,57 @@ function normalizeFoodName(name) {
     .trim();
 }
 
+function formatFoodLabel(name) {
+  if (!name) return "Bilinmiyor";
+  return name.replace(/[-_]+/g, " ");
+}
+
+function computeNutritionAtWeight(food, weightG) {
+  const weight = Number(weightG) || 0;
+  if (!food || weight <= 0) {
+    return { carbsG: 0, calories: 0 };
+  }
+  const factor = weight / 100;
+  return {
+    carbsG:
+      food.carbsPer100g != null
+        ? +((food.carbsPer100g * factor).toFixed(1))
+        : 0,
+    calories:
+      food.caloriesPer100g != null
+        ? +((food.caloriesPer100g * factor).toFixed(1))
+        : 0,
+  };
+}
+
+function statsFromAlternativeItem(item) {
+  const carbs = item?.carbsGEstimated ?? item?.carbs_g_estimated;
+  const calories = item?.caloriesEstimated ?? item?.calories_estimated;
+  if (carbs == null && calories == null) {
+    return null;
+  }
+  return {
+    carbsG: Number(carbs ?? 0),
+    calories: Number(calories ?? 0),
+  };
+}
+
+function findFoodMatch(results, foodName) {
+  const normalized = normalizeFoodName(foodName);
+  if (!normalized || !results?.length) return null;
+
+  return (
+    results.find((item) => normalizeFoodName(item.name) === normalized) ||
+    results.find((item) =>
+      normalizeFoodName(item.name).includes(normalized),
+    ) ||
+    results.find((item) =>
+      normalized.includes(normalizeFoodName(item.name)),
+    ) ||
+    results[0]
+  );
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function PredictionResultScreen({ route, navigation }) {
   const {
@@ -58,6 +109,24 @@ export default function PredictionResultScreen({ route, navigation }) {
   const [gram, setGram] = useState(String(prediction?.weightG ?? ""));
   const [selectedFood, setSelectedFood] = useState(null); // { id, name }
   const [searchQuery, setSearchQuery] = useState(prediction?.foodName ?? "");
+  const [activeFoodName, setActiveFoodName] = useState(
+    prediction?.foodName ?? "Bilinmiyor",
+  );
+  const [activeCarbsG, setActiveCarbsG] = useState(prediction?.carbsG ?? 0);
+  const [activeCalories, setActiveCalories] = useState(
+    prediction?.calories ?? 0,
+  );
+  const [showAlternatives, setShowAlternatives] = useState(false);
+
+  const top5Alternatives = (prediction?.top5 ?? []).filter(
+    (item) => item?.foodName || item?.food_name,
+  );
+
+  const topPredictionStatsRef = useRef({
+    carbsG: prediction?.carbsG ?? 0,
+    calories: prediction?.calories ?? 0,
+  });
+  const nutritionCacheRef = useRef(new Map());
 
   // Food search
   const [searchResults, setSearchResults] = useState([]);
@@ -123,15 +192,69 @@ export default function PredictionResultScreen({ route, navigation }) {
     }
   }, [mode, searchResults, searchQuery, selectedFood?.id]);
 
+  function getAlternativeFoodName(item) {
+    return item?.foodName ?? item?.food_name ?? "";
+  }
+
+  function applyNutritionStats(stats) {
+    setActiveCarbsG(stats?.carbsG ?? 0);
+    setActiveCalories(stats?.calories ?? 0);
+  }
+
+  async function resolveAlternativeNutrition(foodName, item) {
+    const normalized = normalizeFoodName(foodName);
+    const topNormalized = normalizeFoodName(prediction?.foodName ?? "");
+    const weightG = prediction?.weightG ?? 0;
+
+    if (normalized === topNormalized) {
+      return topPredictionStatsRef.current;
+    }
+
+    if (nutritionCacheRef.current.has(normalized)) {
+      return nutritionCacheRef.current.get(normalized);
+    }
+
+    const fromItem = statsFromAlternativeItem(item);
+
+    try {
+      const results = await searchFoods(normalized);
+      const match = findFoodMatch(results, foodName);
+      if (match) {
+        const computed = computeNutritionAtWeight(match, weightG);
+        nutritionCacheRef.current.set(normalized, computed);
+        return computed;
+      }
+    } catch {
+      // Backend araması başarısız olursa API tahminine düş
+    }
+
+    if (fromItem && (fromItem.carbsG > 0 || fromItem.calories > 0)) {
+      nutritionCacheRef.current.set(normalized, fromItem);
+      return fromItem;
+    }
+
+    return { carbsG: 0, calories: 0 };
+  }
+
+  async function selectAlternative(item) {
+    const foodName = getAlternativeFoodName(item);
+    if (!foodName) return;
+
+    setActiveFoodName(foodName);
+    const stats = await resolveAlternativeNutrition(foodName, item);
+    applyNutritionStats(stats);
+  }
+
   // ── Enter edit mode ──────────────────────────────────────────────────
-  async function enterEditMode() {
+  async function enterEditMode(foodNameOverride) {
     setMode("edit");
+    const foodToSearch = foodNameOverride ?? activeFoodName;
 
     // Try to auto-select the predicted food immediately by searching
-    if (prediction?.foodName) {
+    if (foodToSearch) {
       try {
         // Normalize the query before searching (adana-kebap → adana kebap)
-        const normalizedQuery = normalizeFoodName(prediction.foodName);
+        const normalizedQuery = normalizeFoodName(foodToSearch);
         const results = await searchFoods(normalizedQuery);
         const normalizedPredicted = normalizedQuery;
 
@@ -154,11 +277,11 @@ export default function PredictionResultScreen({ route, navigation }) {
           setSearchQuery(match.name);
         } else {
           // Fallback: just set the query, let the useEffect debounce/match handle it
-          setSearchQuery(prediction.foodName);
+          setSearchQuery(foodToSearch);
         }
       } catch (error) {
         // On error, just set the query
-        setSearchQuery(prediction.foodName);
+        setSearchQuery(foodToSearch);
       }
     }
 
@@ -335,23 +458,60 @@ export default function PredictionResultScreen({ route, navigation }) {
         {/* Prediction card */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Tespit Edilen Yemek</Text>
-          <Text style={styles.foodName}>
-            {prediction?.foodName ?? "Bilinmiyor"}
-          </Text>
+          <Text style={styles.foodName}>{formatFoodLabel(activeFoodName)}</Text>
+
+          {top5Alternatives.length > 1 && (
+            <View style={styles.alternativesSection}>
+              <TouchableOpacity
+                style={styles.alternativesHeader}
+                onPress={() => setShowAlternatives((prev) => !prev)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.alternativesTitle}>
+                  Diğer olasılıklar
+                </Text>
+                <Feather
+                  name={showAlternatives ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {showAlternatives &&
+                top5Alternatives.map((item, index) => {
+                  const foodName = getAlternativeFoodName(item);
+                  const isSelected =
+                    normalizeFoodName(foodName) ===
+                    normalizeFoodName(activeFoodName);
+                  return (
+                    <TouchableOpacity
+                      key={`${foodName}-${index}`}
+                      style={[
+                        styles.alternativeItem,
+                        isSelected && styles.alternativeItemSelected,
+                      ]}
+                      onPress={() => selectAlternative(item)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.alternativeMain}>
+                        <Text style={styles.alternativeRank}>{index + 1}.</Text>
+                        <Text style={styles.alternativeName}>
+                          {formatFoodLabel(foodName)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+            </View>
+          )}
 
           <View style={styles.statsRow}>
             <StatBox
               label="Tahmini Ağırlık"
               value={`${prediction?.weightG ?? 0} g`}
             />
-            <StatBox
-              label="Karbonhidrat"
-              value={`${prediction?.carbsG ?? 0} g`}
-            />
-            <StatBox
-              label="Kalori"
-              value={`${prediction?.calories ?? 0} kcal`}
-            />
+            <StatBox label="Karbonhidrat" value={`${activeCarbsG} g`} />
+            <StatBox label="Kalori" value={`${activeCalories} kcal`} />
           </View>
         </View>
 
@@ -361,7 +521,7 @@ export default function PredictionResultScreen({ route, navigation }) {
             style={[styles.btnPrimary, isSaving && styles.btnDisabled]}
             onPress={() => {
               // Quick confirm: we still need a foodId, so go to edit first with auto-selected food
-              enterEditMode();
+              enterEditMode(activeFoodName);
             }}
             disabled={isSaving}
           >
@@ -555,6 +715,55 @@ const styles = StyleSheet.create({
     ...theme.typography.heading,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.lg,
+    textTransform: "capitalize",
+  },
+  alternativesSection: {
+    marginBottom: theme.spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    paddingTop: theme.spacing.sm,
+  },
+  alternativesHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: theme.spacing.xs,
+  },
+  alternativesTitle: {
+    ...theme.typography.caption,
+    color: theme.colors.textPrimary,
+    fontFamily: "Outfit_600SemiBold",
+  },
+  alternativeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: 10,
+    marginTop: theme.spacing.xs,
+    backgroundColor: theme.colors.background,
+  },
+  alternativeItemSelected: {
+    backgroundColor: `${theme.colors.primary}15`,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  alternativeMain: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  alternativeRank: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    width: 20,
+  },
+  alternativeName: {
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    flex: 1,
     textTransform: "capitalize",
   },
   statsRow: {

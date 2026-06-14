@@ -1,6 +1,14 @@
 import * as ImageManipulator from "expo-image-manipulator";
 import { AI_SERVICE_URL } from "../constants/config";
 
+const HEIC_EXTENSIONS = [".heic", ".heif"];
+
+function isHeicUri(uri) {
+  if (!uri) return false;
+  const lower = uri.split("?")[0].toLowerCase();
+  return HEIC_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
 /**
  * POST {AI_SERVICE_URL}/analyze
  *
@@ -13,6 +21,7 @@ import { AI_SERVICE_URL } from "../constants/config";
  * }
  */
 export async function analyzeImage(imageUri) {
+  // HEIC/HEIF dahil tüm formatları JPEG'e dönüştür (ImageManipulator destekliyorsa)
   const normalized = await ImageManipulator.manipulateAsync(
     imageUri,
     [{ resize: { width: 1600 } }],
@@ -21,6 +30,14 @@ export async function analyzeImage(imageUri) {
       format: ImageManipulator.SaveFormat.JPEG,
     },
   );
+
+  if (!normalized?.uri) {
+    throw new Error(
+      isHeicUri(imageUri)
+        ? "HEIC fotoğraf dönüştürülemedi. Lütfen JPEG olarak kaydedip tekrar deneyin."
+        : "Fotoğraf işlenemedi.",
+    );
+  }
 
   const uploadUri = normalized.uri;
   const filename = "snackabetic-photo.jpg";
@@ -73,6 +90,19 @@ export async function analyzeImage(imageUri) {
     fatG: Number(top.fat_g ?? 0),
     confidence: Number(top.confidence ?? 0),
     confidenceLevel: json.confidence_level ?? "low",
-    top5: json.top5 ?? [],
+    top5: (json.top5 ?? []).map((item) => ({
+      foodName: item.food_name ?? item.foodName ?? "",
+      confidence: Number(item.confidence ?? 0),
+      caloriesEstimated: Number(
+        item.calories_estimated ?? item.caloriesEstimated ?? 0,
+      ),
+      carbsGEstimated: Number(
+        item.carbs_g_estimated ?? item.carbsGEstimated ?? 0,
+      ),
+      proteinGEstimated: Number(
+        item.protein_g_estimated ?? item.proteinGEstimated ?? 0,
+      ),
+      fatGEstimated: Number(item.fat_g_estimated ?? item.fatGEstimated ?? 0),
+    })),
   };
 }
