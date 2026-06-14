@@ -405,7 +405,6 @@ class DepthEstimator:
             result = self.pipe(pil_image)
             depth  = np.array(result["depth"], dtype=np.float32)
         elif self.mode == "midas":
-            import cv2
             img = np.array(pil_image.convert("RGB"))
             inp = self.midas_transform(img)
             with torch.no_grad():
@@ -508,8 +507,6 @@ def estimate_weight(
     Yemek kategorisine göre farklı tahmin stratejisi uygular.
     Döner: dict  {weight_g, volume_ml, food_pixel_ratio, scale_confidence, method}
     """
-    import cv2
-
     img_arr          = np.array(pil_image.convert("RGB"))
     img_h, img_w     = img_arr.shape[:2]
     profile          = FOOD_SHAPE_PROFILES.get(food_name)
