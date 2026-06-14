@@ -80,46 +80,23 @@ Notlar:
 - Host AI portunu değiştirmek istersen: `AI_PORT=5010 docker compose up --build`
 - Durdurmak için: `docker compose down`
 
-## Mobile App Başlatma
+**Fiziksel telefondan test edeceksen:** Docker'dan sonra mutlaka [Projeyi tekrar başlatma](#projeyi-tekrar-başlatma-fiziksel-telefon) bölümündeki IP adımlarını uygula.
 
-### 1) Mobile klasörüne gir
+## Projeyi tekrar başlatma (fiziksel telefon)
 
-```bash
-cd Mobile
-```
+Projeyi uzun süre sonra veya farklı bir ağda açtığında **her seferinde** şu sırayı izle. En sık yapılan hata: Docker ve Expo doğru çalışır ama `config.js` içindeki **eski IP** kalır → register/login istekleri **timeout** yer.
 
-### 2) Bağımlılıkları yükle
+### 1) Docker servislerini başlat
 
-```bash
-npm install
-```
-
-### 3) Uygulamayı başlat
-
-**Expo ile:**
+Proje kökünden:
 
 ```bash
-npm start
+docker compose up --build
 ```
 
-Ardından terminalde gösterilen seçeneklerden birini seç:
+Backend `http://localhost:8080` üzerinde ayakta olmalı.
 
-- `i` - iOS simülatörü ile aç
-- `a` - Android emülatörü ile aç
-- `w` - Web tarayıcısı ile aç
-- `j` - Expo Go uygulaması ile cihazdan QR kod tarayarak aç
-
-### 4) Backend yapılandırması
-
-#### Simulator/Emülatör için (varsayılan)
-
-Backend localhost'ta çalışıyorsa sorun yoktur.
-
-#### Fiziksel cihazda çalıştırma için
-
-**Önemli:** Fiziksel cihaz localhost erişemez. Backend sunucunuzun IP adresini kullanmalısınız.
-
-**Adım 1:** Bilgisayarınızın ağdaki IP adresini bulun
+### 2) Bilgisayarının güncel IP adresini bul
 
 macOS/Linux:
 
@@ -133,33 +110,73 @@ Windows:
 ipconfig
 ```
 
-Genellikle `192.168.x.x` veya `10.0.x.x` formatında olur.
+Çıktıdaki `inet` satırındaki adres senin IP'n (ör. `172.2.0.67`, `192.168.1.42`).  
+`npm start` sonrası Expo terminalinde de görünür: `exp://172.2.0.67:8081` → IP burada `172.2.0.67`.
 
-**Adım 2:** `Mobile/src/constants/config.js` dosyasını düzenle
+### 3) `config.js` içindeki IP'yi güncelle (zorunlu)
 
-```javascript
-export const API_BASE_URL = "http://YOUR_IP:8080";
-export const AI_SERVICE_URL = "http://YOUR_IP:5001";
-```
-
-Örnek:
+`Mobile/src/constants/config.js` dosyasını aç ve **her iki satırda da** yukarıdaki IP'yi kullan:
 
 ```javascript
-export const API_BASE_URL = "http://192.168.1.42:8080";
-export const AI_SERVICE_URL = "http://192.168.1.42:5001";
+export const API_BASE_URL = "http://SENIN_IP:8080";
+export const AI_SERVICE_URL = "http://SENIN_IP:5001";
 ```
 
-**Adım 3:** Backend ve AI servisinin fiziksel cihazdan erişilebilir olduğundan emin ol
+Örnek (`172.2.0.67` için):
 
-```bash
-# Cihazın terminal'inde test et
-ping 192.168.1.42
+```javascript
+export const API_BASE_URL = "http://172.2.0.67:8080";
+export const AI_SERVICE_URL = "http://172.2.0.67:5001";
 ```
 
-**Adım 4:** Uygulamayı yeniden başlat
+> Fiziksel telefon `localhost` kullanamaz. IP değiştiğinde (Wi‑Fi değişimi, VPN, hotspot, bilgisayar yeniden başlatma) bu dosyayı mutlaka güncelle.
+
+### 4) Backend'in yeni IP'den erişildiğini doğrula
+
+Mac'te (IP'yi kendi adresinle değiştir):
 
 ```bash
+curl -s -o /dev/null -w "HTTP %{http_code}\n" http://172.2.0.67:8080/
+```
+
+`HTTP 403` veya benzeri bir kod = backend erişilebilir.  
+`HTTP 000` veya timeout = IP yanlış veya Docker çalışmıyor.
+
+### 5) Mobile'ı başlat ve telefondan bağlan
+
+```bash
+cd Mobile
 npm start
 ```
 
-**Not:** IP adresleri değişirse (ağı değiştirdin, bilgisayar yeniden başladı), `config.js`'i güncelle ve uygulamayı yeniden başlat.
+- Telefon ve bilgisayar **aynı Wi‑Fi** ağında olsun
+- QR kodu Expo Go ile tara
+- `config.js` değiştiyse Expo'yu yeniden başlat (`Ctrl+C` → `npm start`)
+
+Expo seçenekleri:
+
+- `i` — iOS simülatörü
+- `a` — Android emülatörü
+- `w` — Web tarayıcısı
+- QR — Fiziksel cihaz (Expo Go)
+
+### Simülatör / emülatör kullanıyorsan
+
+`config.js` içinde localhost yeterli:
+
+```javascript
+export const API_BASE_URL = "http://localhost:8080";
+export const AI_SERVICE_URL = "http://localhost:5001";
+```
+
+## Mobile App (ilk kurulum)
+
+İlk kez kuruyorsan önce bağımlılıkları yükle:
+
+```bash
+cd Mobile
+npm install
+npm start
+```
+
+Sonrasında fiziksel cihaz için yukarıdaki **Projeyi tekrar başlatma** adımlarını uygula.
