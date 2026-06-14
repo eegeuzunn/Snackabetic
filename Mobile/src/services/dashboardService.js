@@ -12,15 +12,23 @@ import { getMyProfile } from "./patientService";
 export async function getDashboardData(days = 7) {
   const today = new Date().toISOString().slice(0, 10);
 
-  const [mealsResult, insulinResult, profileResult, statsResult, trendPoints, recentMealsResult] =
-    await Promise.all([
-      api.get("/meals/by-date", { params: { date: today } }).catch(() => []),
-      api.get("/insulin-doses/by-date", { params: { date: today } }).catch(() => []),
-      getMyProfile().catch(() => null),
-      api.get("/glucose-readings/daily-stats", { params: { date: today } }).catch(() => null),
-      buildGlucoseTrend(days),
-      api.get("/meals", { params: { page: 0, size: 5, sort: "mealTime,desc" } }).catch(() => null),
-    ]);
+  const [
+    mealsResult,
+    insulinResult,
+    profileResult,
+    statsResult,
+    todayGlucoseResult,
+    trendPoints,
+    recentMealsResult,
+  ] = await Promise.all([
+    api.get("/meals/by-date", { params: { date: today } }).catch(() => []),
+    api.get("/insulin-doses/by-date", { params: { date: today } }).catch(() => []),
+    getMyProfile().catch(() => null),
+    api.get("/glucose-readings/daily-stats", { params: { date: today } }).catch(() => null),
+    api.get("/glucose-readings/by-date", { params: { date: today } }).catch(() => []),
+    buildGlucoseTrend(days),
+    api.get("/meals", { params: { page: 0, size: 5, sort: "mealTime,desc" } }).catch(() => null),
+  ]);
 
   const meals = Array.isArray(mealsResult) ? mealsResult : [];
   const totalCarbsG =
@@ -34,6 +42,7 @@ export async function getDashboardData(days = 7) {
     Math.round(doses.reduce((s, d) => s + (parseFloat(d.units) || 0), 0) * 10) / 10;
 
   const recentMeals = recentMealsResult?.content ?? (Array.isArray(recentMealsResult) ? recentMealsResult : []);
+  const todayGlucoseReadings = Array.isArray(todayGlucoseResult) ? todayGlucoseResult : [];
 
   return {
     totalCarbsG,
@@ -42,12 +51,13 @@ export async function getDashboardData(days = 7) {
     totalInsulinUnits,
     profile: profileResult,
     dailyStats: statsResult,
+    todayGlucoseReadings,
     glucoseTrend: trendPoints,
     recentMeals,
   };
 }
 
-/** Fetches glucose by-date for each day and returns avg per day */
+/** Fetches daily-stats for each day (min/max/avg/count) */
 async function buildGlucoseTrend(days) {
   const base = new Date();
 
@@ -59,18 +69,25 @@ async function buildGlucoseTrend(days) {
 
   const settled = await Promise.allSettled(
     dates.map((dateStr) =>
-      api.get("/glucose-readings/by-date", { params: { date: dateStr } })
+      api.get("/glucose-readings/daily-stats", { params: { date: dateStr } })
     )
   );
 
   return dates.map((dateStr, i) => {
     const result = settled[i];
-    if (result.status !== "fulfilled") return { date: dateStr, avg: null };
-    const arr = Array.isArray(result.value) ? result.value : [];
-    const avg =
-      arr.length > 0
-        ? Math.round(arr.reduce((s, r) => s + (r.valueMgDl ?? 0), 0) / arr.length)
-        : null;
-    return { date: dateStr, avg };
+    if (result.status !== "fulfilled") {
+      return { date: dateStr, avg: null, min: null, max: null, readingCount: 0 };
+    }
+    const stats = result.value;
+    if (!stats || stats.readingCount === 0) {
+      return { date: dateStr, avg: null, min: null, max: null, readingCount: 0 };
+    }
+    return {
+      date: dateStr,
+      avg: Math.round(stats.averageValueMgDl),
+      min: stats.minValueMgDl,
+      max: stats.maxValueMgDl,
+      readingCount: stats.readingCount,
+    };
   });
 }
